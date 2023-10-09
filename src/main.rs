@@ -1,7 +1,7 @@
 mod lox;
 
 extern crate lox_derive;
-use lox_derive::{EnumStrings, HelloWorld};
+use lox_derive::{EnumStrings};
 use crate::lox::Token;
 
 pub trait HelloWorld {
