@@ -1,5 +1,5 @@
-struct TokenMetadata {
-    line: usize
+pub struct TokenMetadata {
+    pub line: usize
 }
 
 struct TokenTextValueMetadata<'a> {
@@ -58,4 +58,13 @@ pub enum Token<'a> {
     While(TokenMetadata),
 
     Eof,
+}
+
+impl Token<'_> {
+    pub fn print_token_name(&self) -> String {
+        match self {
+            Token::LeftParen(_) => String::from("Left Paren"),
+            _ => String::from("Other")
+        }
+    }
 }

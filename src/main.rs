@@ -1,16 +1,48 @@
+mod lox;
+
 extern crate lox_derive;
-use lox_derive::HelloWorld;
+use lox_derive::{EnumStrings, HelloWorld};
+use crate::lox::Token;
 
 pub trait HelloWorld {
     fn hello_world();
 }
 
-#[derive(HelloWorld)]
+pub trait hello {
+    fn hi(&self);
+}
+
+struct Toppings {
+    x: i32
+}
+
+struct Sides {
+    y: f32
+}
+
+impl hello for Sides {
+    fn hi(&self) {
+        println!("Hi from sides");
+    }
+}
+
+impl hello for Toppings {
+    fn hi(&self) {
+        println!("Hi from toppings");
+    }
+}
+
+#[derive(EnumStrings)]
 enum Pancakes {
-    Single,
-    Doulble
+    Single(Toppings),
+    Doulble(Sides),
+    Triples(Toppings, Sides),
+    Eof
 }
 
 fn main() {
-    Pancakes::hello_world();
+    let a = Token::LeftParen(lox::TokenMetadata { line: 0 });
+    let b= Pancakes::Triples(Toppings{x:0}, Sides{y:0.0});
+    b.hi();
+    println!("Token {}", a.print_token_name());
 }
