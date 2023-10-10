@@ -9,7 +9,11 @@ pub trait HelloWorld {
 }
 
 pub trait hello {
-    fn hi(&self);
+    fn hi(&self) -> String;
+}
+
+pub trait enum_vectorize {
+    fn enum_to_vector(&self) -> Vec<String>;
 }
 
 struct Toppings {
@@ -21,14 +25,14 @@ struct Sides {
 }
 
 impl hello for Sides {
-    fn hi(&self) {
-        println!("Hi from sides");
+    fn hi(&self) -> String {
+        "Hi from sides".to_string()
     }
 }
 
 impl hello for Toppings {
-    fn hi(&self) {
-        println!("Hi from toppings");
+    fn hi(&self) -> String {
+        "Hi from toppings".to_string()
     }
 }
 
@@ -43,6 +47,5 @@ enum Pancakes {
 fn main() {
     let a = Token::LeftParen(lox::TokenMetadata { line: 0 });
     let b= Pancakes::Triples(Toppings{x:0}, Sides{y:0.0});
-    b.hi();
-    println!("Token {}", a.print_token_name());
+    println!("{:?}", b.enum_to_vector());
 }
