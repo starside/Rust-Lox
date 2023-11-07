@@ -34,7 +34,7 @@ fn impl_enum_strings(ast: &syn::DeriveInput) -> proc_macro2::TokenStream {
                 }).collect();
                 quote!{
                     #name::#variant_name( #(#destructure_vars,)* ) => {
-                        let mut temp: Vec<String> = vec![#(#destructure_vars.hi(),)*];
+                        let mut temp: Vec<String> = vec![#(#destructure_vars.enum_to_element(),)*];
                         rvec.push(stringify!(#variant_name).to_string());
                         rvec.append(&mut temp);
                     },
@@ -50,7 +50,7 @@ fn impl_enum_strings(ast: &syn::DeriveInput) -> proc_macro2::TokenStream {
             branches.push(variant_tokens);
         }
         return quote! {
-            impl enum_vectorize for #name {
+            impl enum_vectorize for #name<'_> {
                 fn enum_to_vector(&self) -> Vec<String> {
                     let mut rvec: Vec<String> = Vec::new();
                     match self {

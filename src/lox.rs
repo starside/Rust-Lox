@@ -1,17 +1,47 @@
+use lox_derive::EnumStrings;
+
+pub trait enum_vectorize {
+    fn enum_to_vector(&self) -> Vec<String>;
+}
+
+trait enum_element {
+    fn enum_to_element(&self) -> String;
+}
+
 pub struct TokenMetadata {
     pub line: usize
 }
 
-struct TokenTextValueMetadata<'a> {
-    metadata: TokenMetadata,
-    lexeme: &'a str
+pub struct TokenTextValueMetadata<'a> {
+    pub(crate) metadata: TokenMetadata,
+    pub(crate) lexeme: &'a str
 }
 
-struct TokenNumberValueMetadata {
+pub struct TokenNumberValueMetadata {
     metadata: TokenMetadata,
     value: f64
 }
 
+impl enum_element for TokenMetadata {
+    fn enum_to_element(&self) -> String {
+        self.line.to_string()
+    }
+}
+
+impl enum_element for TokenTextValueMetadata<'_> {
+    fn enum_to_element(&self) -> String {
+        self.lexeme.to_string()
+    }
+
+}
+
+impl enum_element for TokenNumberValueMetadata {
+    fn enum_to_element(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+#[derive(EnumStrings)]
 pub enum Token<'a> {
     // Single-character tokens
     LeftParen(TokenMetadata),
@@ -58,13 +88,4 @@ pub enum Token<'a> {
     While(TokenMetadata),
 
     Eof,
-}
-
-impl Token<'_> {
-    pub fn print_token_name(&self) -> String {
-        match self {
-            Token::LeftParen(_) => String::from("Left Paren"),
-            _ => String::from("Other")
-        }
-    }
 }
