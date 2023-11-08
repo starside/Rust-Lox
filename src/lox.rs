@@ -1,10 +1,13 @@
+use std::fmt;
+use std::fmt::Formatter;
+extern crate lox_derive;
 use lox_derive::EnumStrings;
 
-pub trait enum_vectorize {
+pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
 }
 
-trait enum_element {
+trait EnumElement {
     fn enum_to_element(&self) -> String;
 }
 
@@ -22,20 +25,20 @@ pub struct TokenNumberValueMetadata {
     value: f64
 }
 
-impl enum_element for TokenMetadata {
+impl EnumElement for TokenMetadata {
     fn enum_to_element(&self) -> String {
         self.line.to_string()
     }
 }
 
-impl enum_element for TokenTextValueMetadata<'_> {
+impl EnumElement for TokenTextValueMetadata<'_> {
     fn enum_to_element(&self) -> String {
         self.lexeme.to_string()
     }
 
 }
 
-impl enum_element for TokenNumberValueMetadata {
+impl EnumElement for TokenNumberValueMetadata {
     fn enum_to_element(&self) -> String {
         self.value.to_string()
     }
@@ -88,4 +91,11 @@ pub enum Token<'a> {
     While(TokenMetadata),
 
     Eof,
+}
+
+impl fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let v: Vec<String> = self.enum_to_vector();
+        write!(f, "{}", v.join(" "))
+    }
 }
