@@ -1,16 +1,25 @@
 mod lox;
 
 extern crate lox_derive;
-use crate::lox::{EnumVectorize, Token};
 
-fn main() {
-    let a = Token::LeftParen(lox::TokenMetadata { line: 0 });
-    println!("{}", a);
+use std::error::Error;
+use crate::lox::{run_prompt, run_file, Token};
+use clap;
+use clap::Parser;
 
-    let b = Token::Identifier(lox::TokenTextValueMetadata{
-        metadata: lox::TokenMetadata{line: 0},
-        lexeme: &"ruger"
-    });
+#[derive(clap::Parser)]
+struct CommandLine {
+    script: Option<std::path::PathBuf>
+}
 
-    println!("{}", b);
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = CommandLine::parse();
+
+    if let Some(path) = args.script {
+        run_file(path)?;
+    }
+    else {
+        run_prompt()?;
+    }
+    Ok(())
 }

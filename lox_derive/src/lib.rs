@@ -3,8 +3,8 @@ extern crate proc_macro2;
 extern crate syn;
 #[macro_use]
 extern crate quote;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data};
+use quote::{quote, ToTokens};
+use syn::{DeriveInput, Data};
 
 use proc_macro::TokenStream;
 

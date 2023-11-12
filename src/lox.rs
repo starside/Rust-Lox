@@ -1,5 +1,11 @@
+use std::str;
+use std::io;
+use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fs::File;
+use std::io::{Read, Write};
+
 extern crate lox_derive;
 use lox_derive::EnumStrings;
 
@@ -98,4 +104,30 @@ impl fmt::Display for Token<'_> {
         let v: Vec<String> = self.enum_to_vector();
         write!(f, "{}", v.join(" "))
     }
+}
+
+fn run(source: &str) -> Result<(), Box<dyn Error>>{
+    Ok(())
+}
+
+pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+    let mut data: Vec<u8> = Vec::new();
+    let data_size = File::open(path)?.read_to_end(&mut data)?;
+    let source_code = str::from_utf8(&*data)?;
+    run(source_code);
+    return Ok(())
+}
+
+pub fn run_prompt() -> Result<(), Box<dyn Error>> {
+    let mut buffer = String::new();
+    loop {
+        io::stdout().write("> ".as_bytes())?;
+        io::stdout().flush()?;
+        let bytes_read = io::stdin().read_line(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        run(&buffer)?;
+    }
+    Ok(())
 }
