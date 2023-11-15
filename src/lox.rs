@@ -21,9 +21,15 @@ pub struct TokenMetadata {
     pub line: usize
 }
 
+impl TokenMetadata {
+    pub fn new(line: usize) ->TokenMetadata {
+        TokenMetadata{line}
+    }
+}
+
 pub struct TokenTextValueMetadata<'a> {
-    pub(crate) metadata: TokenMetadata,
-    pub(crate) lexeme: &'a str
+    pub metadata: TokenMetadata,
+    pub lexeme: &'a str
 }
 
 pub struct TokenNumberValueMetadata {

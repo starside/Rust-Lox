@@ -1,9 +1,10 @@
 mod lox;
+mod scanner;
 
 extern crate lox_derive;
 
 use std::error::Error;
-use crate::lox::{run_prompt, run_file, Token};
+use crate::lox::{run_prompt, run_file};
 use clap;
 use clap::Parser;
 
