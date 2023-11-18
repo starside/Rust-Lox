@@ -80,6 +80,8 @@ pub enum Token<'a> {
     GreaterEqual(TokenMetadata),
     Less(TokenMetadata),
     LessEqual(TokenMetadata),
+    Equal(TokenMetadata),
+    EqualEqual(TokenMetadata),
 
     // Literals
     Identifier(TokenTextValueMetadata<'a>),
