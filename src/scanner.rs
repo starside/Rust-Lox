@@ -2,12 +2,12 @@ use crate::lox;
 use crate::lox::{Token, TokenMetadata};
 use crate::lox::Token::{Comma, Dot, LeftBrace, LeftParen, Minus, Plus, RightBrace, RightParen, Semicolon, Star};
 
-struct ScannerError {
-    line: usize,
-    message: String
+pub struct ScannerError {
+    pub line: usize,
+    pub message: String
 }
 
-struct Scanner<'a> {
+pub struct Scanner<'a> {
     source: &'a str,
     tokens: Vec<Token<'a>>,
 
@@ -27,6 +27,21 @@ impl<'s> Scanner<'s> {
             current: 0,
             line: 1,
             errors: Vec::new()
+        }
+    }
+
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, &Vec<ScannerError>>{
+        while !self.is_at_end() {
+            self.start = self.current;
+            self.scan_token();
+        }
+        self.add_token(Token::Eof);
+
+        if self.errors.is_empty() {
+            Ok(&self.tokens)
+        }
+        else {
+            Err(&self.errors)
         }
     }
 

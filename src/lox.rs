@@ -8,6 +8,8 @@ use std::io::{Read, Write};
 
 extern crate lox_derive;
 use lox_derive::EnumStrings;
+use crate::scanner;
+use crate::scanner::ScannerError;
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -113,6 +115,21 @@ impl fmt::Display for Token<'_> {
 }
 
 fn run(source: &str) -> Result<(), Box<dyn Error>>{
+    println!("Source = {}", source);
+    let mut scanner = scanner::Scanner::new(source);
+    let tokens = scanner.scan_tokens();
+    match tokens {
+        Ok(tokens) => {
+            for token in tokens {
+                println!("{}", token);
+            }
+        }
+        Err(errors) => {
+            for error in errors {
+                println!("Error on line {}: {}", error.line, error.message);
+            }
+        }
+    }
     Ok(())
 }
 
@@ -133,7 +150,8 @@ pub fn run_prompt() -> Result<(), Box<dyn Error>> {
         if bytes_read == 0 {
             break;
         }
-        run(&buffer)?;
+        run(&buffer.trim())?;
+        buffer.clear();
     }
     Ok(())
 }
