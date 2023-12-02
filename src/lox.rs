@@ -8,6 +8,7 @@ use std::io::{Read, Write};
 
 extern crate lox_derive;
 use lox_derive::EnumStrings;
+use crate::lox::Token::And;
 use crate::scanner;
 use crate::scanner::ScannerError;
 
@@ -35,8 +36,8 @@ pub struct TokenTextValueMetadata<'a> {
 }
 
 pub struct TokenNumberValueMetadata {
-    metadata: TokenMetadata,
-    value: f64
+    pub metadata: TokenMetadata,
+    pub value: f64
 }
 
 impl EnumElement for TokenMetadata {

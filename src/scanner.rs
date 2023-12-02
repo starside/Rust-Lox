@@ -1,5 +1,6 @@
 use crate::lox;
-use crate::lox::{Token, TokenMetadata, TokenTextValueMetadata};
+use crate::lox::{Token, TokenMetadata, TokenNumberValueMetadata, TokenTextValueMetadata};
+use std::collections::HashMap;
 
 pub struct ScannerError {
     pub line: usize,
@@ -14,7 +15,8 @@ pub struct Scanner<'a> {
     current: usize,
     line: usize,
 
-    errors: Vec<ScannerError>
+    errors: Vec<ScannerError>,
+    identifier_table: HashMap<&'static str, fn(TokenMetadata) -> Token<'a>>
 }
 
 impl<'s> Scanner<'s> {
@@ -25,8 +27,77 @@ impl<'s> Scanner<'s> {
             start: 0,
             current: 0,
             line: 1,
-            errors: Vec::new()
+            errors: Vec::new(),
+            identifier_table: Scanner::build_identifier_hash()
         }
+    }
+
+    fn build_identifier_hash() -> HashMap<&'static str, fn(TokenMetadata) -> Token<'s>>{
+        let mut identifiers:HashMap<&str, fn(TokenMetadata) -> Token<'s>> = HashMap::new();
+
+        identifiers.insert("and", |x: TokenMetadata|
+            {
+                Token::And(x)
+            });
+        identifiers.insert("class", |x: TokenMetadata|
+            {
+                Token::Class(x)
+            });
+        identifiers.insert("else", |x: TokenMetadata|
+            {
+                Token::Else(x)
+            });
+        identifiers.insert("false", |x: TokenMetadata|
+            {
+                Token::False(x)
+            });
+        identifiers.insert("for", |x: TokenMetadata|
+            {
+                Token::For(x)
+            });
+        identifiers.insert("fun", |x: TokenMetadata|
+            {
+                Token::Fun(x)
+            });
+        identifiers.insert("if", |x: TokenMetadata|
+            {
+                Token::If(x)
+            });
+        identifiers.insert("nil", |x: TokenMetadata|
+            {
+                Token::Nil(x)
+            });
+        identifiers.insert("or", |x: TokenMetadata|
+            {
+                Token::Or(x)
+            });
+        identifiers.insert("print", |x: TokenMetadata|
+            {
+                Token::Print(x)
+            });
+        identifiers.insert("return", |x: TokenMetadata|
+            {
+                Token::Return(x)
+            });identifiers.insert("super", |x: TokenMetadata|
+            {
+                Token::Super(x)
+            });
+        identifiers.insert("this", |x: TokenMetadata|
+            {
+                Token::This(x)
+            });identifiers.insert("true", |x: TokenMetadata|
+            {
+                Token::True(x)
+            });identifiers.insert("var", |x: TokenMetadata|
+            {
+                Token::Var(x)
+            });
+            identifiers.insert("while", |x: TokenMetadata|
+            {
+                Token::While(x)
+            });
+
+        identifiers
     }
 
     pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, &Vec<ScannerError>>{
@@ -92,7 +163,7 @@ impl<'s> Scanner<'s> {
             },
             '/' => {
                 let matched = self.match_char('/');
-                if(matched) {
+                if matched {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
@@ -105,9 +176,52 @@ impl<'s> Scanner<'s> {
             // String
             '"' => self.string(),
 
+            // Number literal
+            '0'..='9' => {
+                self.number();
+            },
+
+            // Identifier
+            'a'..='z' | 'A'..='Z' | '_' => {
+                self.identifier();
+            },
+
             // Error
             _ => self.error(format!("Unexpected character {}", c))
         };
+    }
+
+    fn identifier(&mut self) {
+        while self.peek().is_ascii_alphanumeric() {self.advance();}
+        let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
+
+        if let Some(keyword) = self.identifier_table.get(value) {
+            self.add_token(keyword(self.ntmd()));
+        }
+        else {
+            self.add_token(Token::Identifier(TokenTextValueMetadata{
+                metadata: self.ntmd(),
+                lexeme: value
+            }));
+        }
+    }
+
+    fn number(&mut self) {
+        while self.peek().is_ascii_digit() {
+            self.advance();
+        }
+
+        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
+            self.advance();
+            while self.peek().is_ascii_digit() {
+                self.advance();
+            }
+        }
+        let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
+        self.add_token(Token::Number(TokenNumberValueMetadata{
+            metadata: self.ntmd(),
+            value: value.parse::<f64>().unwrap()
+        }));
     }
 
     fn string(&mut self) {
@@ -134,6 +248,13 @@ impl<'s> Scanner<'s> {
             return 0 as char;
         }
         self.source.as_bytes()[self.current] as char
+    }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            return 0 as char;
+        }
+        self.source.as_bytes()[self.current + 1] as char
     }
 
     fn add_token(&mut self, token: Token<'s>) {
