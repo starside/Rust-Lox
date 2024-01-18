@@ -32,9 +32,9 @@ impl TokenMetadata {
     }
 }
 
-pub struct TokenTextValueMetadata<'a> {
+pub struct TokenTextValueMetadata {
     pub metadata: TokenMetadata,
-    pub lexeme: &'a str
+    pub lexeme: String
 }
 
 pub struct TokenNumberValueMetadata {
@@ -48,7 +48,7 @@ impl EnumElement for TokenMetadata {
     }
 }
 
-impl EnumElement for TokenTextValueMetadata<'_> {
+impl EnumElement for TokenTextValueMetadata {
     fn enum_to_element(&self) -> String {
         self.lexeme.to_string()
     }
@@ -62,7 +62,7 @@ impl EnumElement for TokenNumberValueMetadata {
 }
 
 #[derive(EnumStrings)]
-pub enum Token<'a> {
+pub enum Token {
     // Single-character tokens
     LeftParen(TokenMetadata),
     RightParen(TokenMetadata),
@@ -87,8 +87,8 @@ pub enum Token<'a> {
     EqualEqual(TokenMetadata),
 
     // Literals
-    Identifier(TokenTextValueMetadata<'a>),
-    String(TokenTextValueMetadata<'a>),
+    Identifier(TokenTextValueMetadata),
+    String(TokenTextValueMetadata),
     Number(TokenNumberValueMetadata),
 
     // Keywords
@@ -112,15 +112,17 @@ pub enum Token<'a> {
     Eof,
 }
 
+type Object = i32;
+
 derive_ast!(
-    LoxAst / Expr /
+    Ast/Expr/
     Binary : Expr left, Token operator, Expr right;
     Grouping : Expr expression;
     Literal : Object value;
     Unary : Token operator, Expr right;
 );
 
-impl fmt::Display for Token<'_> {
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let v: Vec<String> = self.enum_to_vector();
         write!(f, "{}", v.join(" "))

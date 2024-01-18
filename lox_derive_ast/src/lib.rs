@@ -173,7 +173,7 @@ fn parse_rule(rule: &str) -> Result<Rule, String> {
 
     let field_list = field_list.iter()
         .map(|field| {
-            let new_field: Vec<&str> = field.split(" ")
+            let new_field: Vec<&str> = field.split(char::is_whitespace)
                 .map(|x| x.trim())
                 .filter(|x| x.len() > 0)
                 .collect();
@@ -204,6 +204,8 @@ pub fn derive_ast(input: TokenStream) -> TokenStream {
     let table_name = input_array[0].to_string().clone();
     let expression_name = input_array[1].to_string().clone();
     let input_string = input_array[2].to_string().clone();
+
+    println!("{}: {:?}", input_array.len(), input_array);
 
     let rules: Vec<&str> =input_string
         .split(";")

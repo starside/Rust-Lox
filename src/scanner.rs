@@ -9,14 +9,14 @@ pub struct ScannerError {
 
 pub struct Scanner<'a> {
     source: &'a str,
-    tokens: Vec<Token<'a>>,
+    tokens: Vec<Token>,
 
     start: usize,
     current: usize,
     line: usize,
 
     errors: Vec<ScannerError>,
-    identifier_table: HashMap<&'static str, fn(TokenMetadata) -> Token<'a>>
+    identifier_table: HashMap<&'static str, fn(TokenMetadata) -> Token>
 }
 
 impl<'s> Scanner<'s> {
@@ -32,8 +32,8 @@ impl<'s> Scanner<'s> {
         }
     }
 
-    fn build_identifier_hash() -> HashMap<&'static str, fn(TokenMetadata) -> Token<'s>>{
-        let mut identifiers:HashMap<&str, fn(TokenMetadata) -> Token<'s>> = HashMap::new();
+    fn build_identifier_hash() -> HashMap<&'static str, fn(TokenMetadata) -> Token>{
+        let mut identifiers:HashMap<&str, fn(TokenMetadata) -> Token> = HashMap::new();
 
         identifiers.insert("and", |x: TokenMetadata|
             {
@@ -201,7 +201,7 @@ impl<'s> Scanner<'s> {
         else {
             self.add_token(Token::Identifier(TokenTextValueMetadata{
                 metadata: self.ntmd(),
-                lexeme: value
+                lexeme: value.to_string()
             }));
         }
     }
@@ -240,7 +240,7 @@ impl<'s> Scanner<'s> {
         // The closing "
         self.advance();
         let value = std::str::from_utf8(&self.source.as_bytes()[(self.start+1)..(self.current-1)]).unwrap();
-        self.add_token(Token::String(TokenTextValueMetadata {metadata: self.ntmd(), lexeme: value}))
+        self.add_token(Token::String(TokenTextValueMetadata {metadata: self.ntmd(), lexeme: value.to_string()}))
     }
 
     fn peek(&self) -> char {
@@ -257,7 +257,7 @@ impl<'s> Scanner<'s> {
         self.source.as_bytes()[self.current + 1] as char
     }
 
-    fn add_token(&mut self, token: Token<'s>) {
+    fn add_token(&mut self, token: Token) {
         self.tokens.push(token);
     }
 

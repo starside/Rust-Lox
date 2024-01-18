@@ -50,7 +50,7 @@ fn impl_enum_strings(ast: &syn::DeriveInput) -> proc_macro2::TokenStream {
             branches.push(variant_tokens);
         }
         return quote! {
-            impl EnumVectorize for #name<'_> {
+            impl EnumVectorize for #name {
                 fn enum_to_vector(&self) -> Vec<String> {
                     let mut rvec: Vec<String> = Vec::new();
                     match self {
