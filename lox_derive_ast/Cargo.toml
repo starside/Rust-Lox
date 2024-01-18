@@ -1,15 +1,14 @@
 [package]
-name = "lox_derive"
+name = "lox_derive_ast"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-proc-macro = true
 
 [dependencies]
 quote = "1.0.35"
 syn = "2.0.48"
 proc-macro2 = "1.0.76"
 
+[lib]
+proc-macro = true

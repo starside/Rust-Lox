@@ -7,7 +7,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 extern crate lox_derive;
+extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
+use lox_derive_ast::derive_ast;
 use crate::lox::Token::And;
 use crate::scanner;
 use crate::scanner::ScannerError;
@@ -109,6 +111,14 @@ pub enum Token<'a> {
 
     Eof,
 }
+
+derive_ast!(
+    LoxAst / Expr /
+    Binary : Expr left, Token operator, Expr right;
+    Grouping : Expr expression;
+    Literal : Object value;
+    Unary : Token operator, Expr right;
+);
 
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
