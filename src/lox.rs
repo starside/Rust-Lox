@@ -112,15 +112,23 @@ pub enum Token {
     Eof,
 }
 
-type Object = i32;
+pub mod Ast {
+    use crate::lox::Token;
+    use lox_derive_ast::derive_ast;
 
-derive_ast!(
-    Ast/Expr/
-    Binary : Expr left, Token operator, Expr right;
-    Grouping : Expr expression;
-    Literal : Object value;
-    Unary : Token operator, Expr right;
-);
+    pub enum LiteralValue {
+        String(String),
+        Number(f64)
+    }
+
+    derive_ast!(
+        Ast/Expr/
+        Binary : Expr left, Token operator, Expr right;
+        Grouping : Expr expression;
+        Literal : LiteralValue value;
+        Unary : Token operator, Expr right;
+    );
+}
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

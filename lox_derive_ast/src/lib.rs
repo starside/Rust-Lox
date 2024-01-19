@@ -130,7 +130,7 @@ impl quote::ToTokens for Field {
         let type_string = self.typename.clone();
         let type_string_idn = format_ident!("{}", type_string);
         let gen = quote! {
-            #name_idn: #type_string_idn
+            pub #name_idn: #type_string_idn
         };
         gen.to_tokens(tokens);
     }
@@ -142,7 +142,7 @@ impl quote::ToTokens for Rule {
         let idn = format_ident!("{}", name);
         let field_iter = self.fields.iter();
         let gen = quote! {
-            struct #idn {
+            pub struct #idn {
                 #(#field_iter),*
             }
         };
@@ -235,7 +235,7 @@ pub fn derive_ast(input: TokenStream) -> TokenStream {
         .collect();
     let expr_enum_branches_iter = expr_enum_branches.iter();
     let gen_enum = quote! {
-        enum #expression_name_idn {
+        pub enum #expression_name_idn {
             Empty,
             #(#expr_enum_branches_iter)*
         }
