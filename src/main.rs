@@ -7,7 +7,7 @@ use std::error::Error;
 use crate::lox::{run_prompt, run_file, Token, TokenMetadata};
 use clap;
 use clap::Parser;
-use crate::lox::Ast::{Accept, LiteralValue};
+use crate::lox::ast::{Accept, LiteralValue};
 
 #[derive(clap::Parser)]
 struct CommandLine {
@@ -15,24 +15,24 @@ struct CommandLine {
 }
 
 struct PrettyPrinter;
-impl lox::Ast::AstVisitor<String> for PrettyPrinter
+impl lox::ast::AstVisitor<String> for PrettyPrinter
 {
-    fn visit_binary(&mut self, visitor: &lox::Ast::Binary) -> String {
+    fn visit_binary(&mut self, visitor: &lox::ast::Binary) -> String {
         todo!()
     }
 
-    fn visit_grouping(&mut self, visitor: &lox::Ast::Grouping) -> String {
+    fn visit_grouping(&mut self, visitor: &lox::ast::Grouping) -> String {
         todo!()
     }
 
-    fn visit_literal(&mut self, visitor: &lox::Ast::Literal) -> String {
+    fn visit_literal(&mut self, visitor: &lox::ast::Literal) -> String {
         match &visitor.value {
             LiteralValue::String(x) => {x.to_string()}
             LiteralValue::Number(x) => {x.to_string()}
         }
     }
 
-    fn visit_unary(&mut self, visitor: &lox::Ast::Unary) -> String {
+    fn visit_unary(&mut self, visitor: &lox::ast::Unary) -> String {
         format!("(unary {} {}  )", visitor.operator.to_string(), visitor.right.accept(self))
     }
 }
@@ -40,10 +40,10 @@ impl lox::Ast::AstVisitor<String> for PrettyPrinter
 fn main() -> Result<(), Box<dyn Error>> {
     let args = CommandLine::parse();
 
-    let unary = lox::Ast::Unary{
+    let unary = lox::ast::Unary{
         operator: Token::Minus(TokenMetadata::new(1)) ,
-        right: lox::Ast::Expr::Literal(Box::new((
-            lox::Ast::Literal{value: lox::Ast::LiteralValue::Number(123.0)}
+        right: lox::ast::Expr::Literal(Box::new((
+            lox::ast::Literal{value: lox::ast::LiteralValue::Number(123.0)}
             )))
     };
 

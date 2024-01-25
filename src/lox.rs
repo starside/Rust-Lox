@@ -112,7 +112,7 @@ pub enum Token {
     Eof,
 }
 
-pub mod Ast {
+pub mod ast {
     use crate::lox::Token;
     use lox_derive_ast::derive_ast;
 
@@ -160,7 +160,7 @@ pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
     let mut data: Vec<u8> = Vec::new();
     let data_size = File::open(path)?.read_to_end(&mut data)?;
     let source_code = str::from_utf8(&*data)?;
-    run(source_code);
+    run(source_code).expect("TODO: panic message");
     return Ok(())
 }
 
