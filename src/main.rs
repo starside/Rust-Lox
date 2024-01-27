@@ -18,11 +18,11 @@ struct PrettyPrinter;
 impl lox::ast::AstVisitor<String> for PrettyPrinter
 {
     fn visit_binary(&mut self, visitor: &lox::ast::Binary) -> String {
-        todo!()
+        format!("(binary {} {} {})", visitor.left.accept(self), visitor.operator.to_string(), visitor.right.accept(self))
     }
 
     fn visit_grouping(&mut self, visitor: &lox::ast::Grouping) -> String {
-        todo!()
+        format!("(grouping {})", visitor.expression.accept(self))
     }
 
     fn visit_literal(&mut self, visitor: &lox::ast::Literal) -> String {
