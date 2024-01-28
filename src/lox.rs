@@ -173,9 +173,14 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
     match tokens {
         Ok(tokens) => {
             let mut parser = Parser::new(tokens);
-            let pe = parser.parse();
-            let mut pp = PrettyPrinter;
-            println!("AST{}", pe.accept(&mut pp));
+            if let Ok(pe) = parser.parse()
+            {
+                let mut pp = PrettyPrinter;
+                println!("AST{}", pe.accept(&mut pp));
+            }
+            else {
+                println!("Parse Error");
+            }
             for token in tokens {
                 println!("{}", token);
             }
