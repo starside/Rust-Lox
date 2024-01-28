@@ -3,16 +3,14 @@ use std::io;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
-use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Write};
 
 extern crate lox_derive;
 extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
-use lox_derive_ast::derive_ast;
-use crate::lox::Token::And;
-use crate::scanner;
-use crate::scanner::ScannerError;
+use crate::lox::ast::{Accept, LiteralValue};
+use crate::parser::Parser;
+use crate::{lox, scanner};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -22,6 +20,7 @@ trait EnumElement {
     fn enum_to_element(&self) -> String;
 }
 
+#[derive(Clone)]
 pub struct TokenMetadata {
     pub line: usize
 }
@@ -32,11 +31,13 @@ impl TokenMetadata {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenTextValueMetadata {
     pub metadata: TokenMetadata,
     pub lexeme: String
 }
 
+#[derive(Clone)]
 pub struct TokenNumberValueMetadata {
     pub metadata: TokenMetadata,
     pub value: f64
@@ -61,7 +62,7 @@ impl EnumElement for TokenNumberValueMetadata {
     }
 }
 
-#[derive(EnumStrings)]
+#[derive(EnumStrings, Clone)]
 pub enum Token {
     // Single-character tokens
     LeftParen(TokenMetadata),
@@ -118,16 +119,19 @@ pub mod ast {
 
     pub enum LiteralValue {
         String(String),
-        Number(f64)
+        Number(f64),
+        Nil
     }
 
     derive_ast!(
         Ast/Expr/
-        Binary : Expr left, Token operator, Expr right;
-        Grouping : Expr expression;
+        Binary : ExprBox left, Token operator, ExprBox right;
+        Grouping : ExprBox expression;
         Literal : LiteralValue value;
-        Unary : Token operator, Expr right;
+        Unary : Token operator, ExprBox right;
     );
+
+    type ExprBox = Box<Expr>;
 }
 
 impl fmt::Display for Token {
@@ -137,12 +141,41 @@ impl fmt::Display for Token {
     }
 }
 
+struct PrettyPrinter;
+impl lox::ast::AstVisitor<String> for PrettyPrinter
+{
+    fn visit_binary(&mut self, visitor: &lox::ast::Binary) -> String {
+        format!("(binary {} {} {})", visitor.left.accept(self), visitor.operator.to_string(), visitor.right.accept(self))
+    }
+
+    fn visit_grouping(&mut self, visitor: &lox::ast::Grouping) -> String {
+        format!("(grouping {})", visitor.expression.accept(self))
+    }
+
+    fn visit_literal(&mut self, visitor: &lox::ast::Literal) -> String {
+        let lv = match &visitor.value {
+            LiteralValue::String(x) => {x.to_string()}
+            LiteralValue::Number(x) => {x.to_string()}
+            LiteralValue::Nil => {"Nil".to_string()}
+        };
+        format!("(literal {})", lv)
+    }
+
+    fn visit_unary(&mut self, visitor: &lox::ast::Unary) -> String {
+        format!("(unary {} {}  )", visitor.operator.to_string(), visitor.right.accept(self))
+    }
+}
+
 fn run(source: &str) -> Result<(), Box<dyn Error>>{
     println!("Source = {}", source);
     let mut scanner = scanner::Scanner::new(source);
     let tokens = scanner.scan_tokens();
     match tokens {
         Ok(tokens) => {
+            let mut parser = Parser::new(tokens);
+            let pe = parser.parse();
+            let mut pp = PrettyPrinter;
+            println!("AST{}", pe.accept(&mut pp));
             for token in tokens {
                 println!("{}", token);
             }
@@ -157,8 +190,8 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
 }
 
 pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-    let mut data: Vec<u8> = Vec::new();
-    let data_size = File::open(path)?.read_to_end(&mut data)?;
+    let data: Vec<u8> = Vec::new();
+    println!("Not loading file {}", path.to_str().unwrap());
     let source_code = str::from_utf8(&*data)?;
     run(source_code).expect("TODO: panic message");
     return Ok(())

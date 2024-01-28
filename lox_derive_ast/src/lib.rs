@@ -1,9 +1,7 @@
 use proc_macro;
 use proc_macro::TokenStream;
 use proc_macro2;
-use proc_macro2::Span;
-use quote::{format_ident, quote, ToTokens};
-use quote::TokenStreamExt;
+use quote::{format_ident, quote};
 
 struct Field {
     name: String,

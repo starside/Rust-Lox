@@ -1,4 +1,3 @@
-use crate::lox;
 use crate::lox::{Token, TokenMetadata, TokenNumberValueMetadata, TokenTextValueMetadata};
 use std::collections::HashMap;
 
@@ -126,7 +125,6 @@ impl<'s> Scanner<'s> {
 
     fn scan_token(&mut self) {
         let c = self.advance();
-        let literal = &self.source.as_bytes()[self.start..self.current];
         match c {
             // Single character tokens
             '(' => self.add_token(Token::LeftParen(self.ntmd())),
