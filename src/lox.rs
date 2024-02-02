@@ -11,6 +11,7 @@ use lox_derive::EnumStrings;
 use crate::lox::ast::{Accept, LiteralValue};
 use crate::parser::Parser;
 use crate::{lox, scanner};
+use crate::interpreter::Interpreter;
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -117,9 +118,11 @@ pub mod ast {
     use crate::lox::Token;
     use lox_derive_ast::derive_ast;
 
+    #[derive(Clone, Debug)]
     pub enum LiteralValue {
         String(String),
         Number(f64),
+        Boolean(bool),
         Nil
     }
 
@@ -156,6 +159,7 @@ impl lox::ast::AstVisitor<String> for PrettyPrinter
         let lv = match &visitor.value {
             LiteralValue::String(x) => {x.to_string()}
             LiteralValue::Number(x) => {x.to_string()}
+            LiteralValue::Boolean(b) => {b.to_string()}
             LiteralValue::Nil => {"Nil".to_string()}
         };
         format!("(literal {})", lv)
@@ -176,7 +180,19 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
             if let Ok(pe) = parser.parse()
             {
                 let mut pp = PrettyPrinter;
+                let mut ip = Interpreter;
+
                 println!("AST{}", pe.accept(&mut pp));
+                match pe.accept(&mut ip)
+                {
+                    Ok(v) => {
+                        println!("Evalutated to {:?}", v);
+                    }
+
+                    Err(v) => {
+                        println!("Runtime Error {}", v);
+                    }
+                }
             }
             else {
                 println!("Parse Error");

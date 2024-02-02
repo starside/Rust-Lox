@@ -1,6 +1,7 @@
 mod lox;
 mod scanner;
 mod parser;
+mod interpreter;
 
 extern crate lox_derive;
 

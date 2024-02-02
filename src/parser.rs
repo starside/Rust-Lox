@@ -172,11 +172,11 @@ impl<'a> Parser<'a> {
 
     fn primary(&mut self) -> ParserResult {
         if self.match_token(Token::is_false) {
-            return Ok(Box::new(Expr::Literal(Box::new(ast::Literal{value: LiteralValue::Number(0.0)}))));
+            return Ok(Box::new(Expr::Literal(Box::new(ast::Literal{value: LiteralValue::Boolean(false)}))));
         }
 
         if self.match_token(Token::is_true) {
-            return Ok(Box::new(Expr::Literal(Box::new(ast::Literal{value: LiteralValue::Number(1.0)}))));
+            return Ok(Box::new(Expr::Literal(Box::new(ast::Literal{value: LiteralValue::Boolean(true)}))));
         }
 
         if self.match_token(Token::is_nil) {
