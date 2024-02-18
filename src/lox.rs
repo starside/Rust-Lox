@@ -3,7 +3,8 @@ use std::io;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
-use std::io::{Write};
+use std::fs::File;
+use std::io::{Read, Write};
 
 extern crate lox_derive;
 extern crate lox_derive_ast;
@@ -12,7 +13,7 @@ use crate::lox::ast::expression::{Accept, LiteralValue};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::Interpreter;
-use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print};
+use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Stmt};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -204,45 +205,29 @@ impl ast::statement::StmtVisitor<String> for PrintStatements {
 }
 
 fn run(source: &str) -> Result<(), Box<dyn Error>>{
-    println!("Source = {}", source);
     let mut scanner = scanner::Scanner::new(source);
     let tokens = scanner.scan_tokens();
     match tokens {
         Ok(tokens) => {
             let mut parser = Parser::new(tokens);
-            /*if let Ok(pe) = parser.parse()
-            {
-                let mut pp = PrettyPrinter;
-                let mut ip = Interpreter;
-
-                println!("AST{}", pe.accept(&mut pp));
-                match pe.accept(&mut ip)
-                {
-                    Ok(v) => {
-                        println!("Evalutated to {:?}", v);
-                    }
-
-                    Err(v) => {
-                        println!("Runtime Error {}", v);
+            match parser.parse() {
+                Ok(statements) => {
+                    let mut interpreter = Interpreter;
+                    for s in statements {
+                        if let Err(err) = s.accept(&mut interpreter) {
+                            println!("Runtime Error: {}", err);
+                        }
                     }
                 }
-            }*/
-            if let Ok(statements) = parser.parse_statements(){
-                let mut ip = Interpreter;
-                for s in statements {
-                    s.accept(&mut ip).expect("TODO: panic message");
+                Err(err) => {
+                    let (a, b) = err;
+                    println!("Parse Error: {}", b);
                 }
-            }
-            else {
-                println!("Parse Error");
-            }
-            for token in tokens {
-                println!("{}", token);
             }
         }
         Err(errors) => {
             for error in errors {
-                println!("Error on line {}: {}", error.line, error.message);
+                println!("Tokenizer error on line {}: {}", error.line, error.message);
             }
         }
     }
@@ -250,10 +235,10 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
 }
 
 pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-    let data: Vec<u8> = Vec::new();
-    println!("Not loading file {}", path.to_str().unwrap());
+    let mut data: Vec<u8> = Vec::new();
+    File::open(path)?.read_to_end(&mut data)?;
     let source_code = str::from_utf8(&*data)?;
-    run(source_code).expect("TODO: panic message");
+    run(source_code)?;
     return Ok(())
 }
 
