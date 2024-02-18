@@ -119,7 +119,6 @@ pub mod ast {
     pub mod expression{
         use crate::lox::Token;
         use lox_derive_ast::derive_ast;
-        use crate::lox::ast::ExprBox;
 
         #[derive(Clone, Debug)]
         pub enum LiteralValue {
@@ -131,10 +130,10 @@ pub mod ast {
 
         derive_ast!(
             Ast/Expr/
-            Binary : ExprBox left, Token operator, ExprBox right;
-            Grouping : ExprBox expression;
+            Binary : Expr left, Token operator, Expr right;
+            Grouping : Expr expression;
             Literal : LiteralValue value;
-            Unary : Token operator, ExprBox right;
+            Unary : Token operator, Expr right;
         );
     }
     pub mod statement{
@@ -148,8 +147,6 @@ pub mod ast {
             Print : Expr expression;
         );
     }
-
-    type ExprBox = Box<expression::Expr>;
 }
 
 impl fmt::Display for Token {

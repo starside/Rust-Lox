@@ -1,6 +1,5 @@
 use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
-use crate::lox::ast::statement;
 use crate::lox::ast::statement::{Print, Expression, Stmt};
 
 pub struct Parser<'a> {
@@ -95,7 +94,7 @@ impl<'a> Parser<'a> {
             let right = self.term()?;
             left = Box::new(
                 Expr::Binary(
-                    Box::new(Binary{left, operator, right})
+                    Box::new(Binary{left: *left, operator, right: *right})
                 )
             );
         }
@@ -113,7 +112,7 @@ impl<'a> Parser<'a> {
             let right = self.comparison()?;
             left = Box::new(
                 Expr::Binary(
-                    Box::new(Binary{left, operator, right})
+                    Box::new(Binary{left: *left, operator, right: *right})
                 )
             );
         }
@@ -137,7 +136,7 @@ impl<'a> Parser<'a> {
             let right = self.factor()?;
             left = Box::new(
                 Expr::Binary(
-                    Box::new(Binary{left, operator, right})
+                    Box::new(Binary{left: *left, operator, right: *right})
                 )
             );
         }
@@ -156,7 +155,7 @@ impl<'a> Parser<'a> {
             let right = self.unary()?;
             left = Box::new(
                 Expr::Binary(
-                    Box::new(Binary{left, operator, right})
+                    Box::new(Binary{left: *left, operator, right: *right})
                 )
             );
         }
@@ -173,7 +172,7 @@ impl<'a> Parser<'a> {
             let right = self.unary()?;
             return Ok(Box::new(
                 Expr::Unary(
-                    Box::new(Unary{operator, right})
+                    Box::new(Unary{operator, right: *right})
                 )
             ));
         }
@@ -209,7 +208,7 @@ impl<'a> Parser<'a> {
         if self.match_token(Token::is_leftparen) {
             let expr = self.expression()?;
             self.consume(Token::is_rightparen, "Expected )".to_string())?;
-            return Ok(Box::new(Expr::Grouping(Box::new(ast::expression::Grouping{expression: expr}))));
+            return Ok(Box::new(Expr::Grouping(Box::new(ast::expression::Grouping{expression: *expr}))));
         }
 
         Err(self.error(self.peek(), "Expected expression".to_string()))
