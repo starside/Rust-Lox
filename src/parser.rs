@@ -8,7 +8,7 @@ pub struct Parser<'a> {
 }
 
 type ParserError = (Token, String);
-type ParserResult = Result<Box<Expr>, ParserError>;
+type ParserResult = Result<Expr, ParserError>;
 type StatementResult = Result<Stmt, ParserError>;
 
 impl<'a> Parser<'a> {
@@ -88,11 +88,10 @@ impl<'a> Parser<'a> {
         }) {
             let operator = self.previous().clone();
             let right = self.term()?;
-            left = Box::new(
+            left =
                 Expr::Binary(
-                    Box::new(Binary{left: *left, operator, right: *right})
-                )
-            );
+                    Box::new(Binary{left: left, operator, right: right})
+                );
         }
 
         Ok(left)
@@ -106,11 +105,10 @@ impl<'a> Parser<'a> {
         }) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
-            left = Box::new(
+            left =
                 Expr::Binary(
-                    Box::new(Binary{left: *left, operator, right: *right})
-                )
-            );
+                    Box::new(Binary{left: left, operator, right: right})
+                );
         }
 
         Ok(left)
@@ -130,11 +128,9 @@ impl<'a> Parser<'a> {
         }) {
             let operator = self.previous().clone();
             let right = self.factor()?;
-            left = Box::new(
-                Expr::Binary(
-                    Box::new(Binary{left: *left, operator, right: *right})
-                )
-            );
+            left = Expr::Binary(
+                    Box::new(Binary{left: left, operator, right: right})
+                );
         }
 
         Ok(left)
@@ -149,11 +145,9 @@ impl<'a> Parser<'a> {
         }) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            left = Box::new(
-                Expr::Binary(
-                    Box::new(Binary{left: *left, operator, right: *right})
-                )
-            );
+            left = Expr::Binary(
+                    Box::new(Binary{left: left, operator, right: right})
+                );
         }
 
         Ok(left)
@@ -166,11 +160,10 @@ impl<'a> Parser<'a> {
         }) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(Box::new(
-                Expr::Unary(
-                    Box::new(Unary{operator, right: *right})
+            return Ok(Expr::Unary(
+                    Box::new(Unary{operator, right: right})
                 )
-            ));
+            );
         }
 
         self.primary()
@@ -178,15 +171,15 @@ impl<'a> Parser<'a> {
 
     fn primary(&mut self) -> ParserResult {
         if self.match_token(Token::is_false) {
-            return Ok(Box::new(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(false)}))));
+            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(false)})));
         }
 
         if self.match_token(Token::is_true) {
-            return Ok(Box::new(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)}))));
+            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)})));
         }
 
         if self.match_token(Token::is_nil) {
-            return Ok(Box::new(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Nil}))));
+            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Nil})));
         }
 
         if self.match_token(|x|{
@@ -199,13 +192,13 @@ impl<'a> Parser<'a> {
                 Token::Identifier(x) => LiteralValue::String(x.lexeme.clone()),
                 _ => panic!("Error")
             };
-            return Ok(Box::new(Expr::Literal(Box::new(ast::expression::Literal{value}))));
+            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value})));
         }
 
         if self.match_token(|x|{ Token::is_identifier(x)}) {
             let previous = self.previous();
             if let Token::Identifier(x) = previous {
-                return Ok(Box::new(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()}))));
+                return Ok(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()})));
             };
 
         }
@@ -213,7 +206,7 @@ impl<'a> Parser<'a> {
         if self.match_token(Token::is_leftparen) {
             let expr = self.expression()?;
             self.consume(Token::is_rightparen, "Expected )".to_string())?;
-            return Ok(Box::new(Expr::Grouping(Box::new(ast::expression::Grouping{expression: *expr}))));
+            return Ok(Expr::Grouping(Box::new(ast::expression::Grouping{expression: expr})));
         }
 
         Err(self.error(self.peek(), "Expected expression".to_string()))
@@ -237,7 +230,7 @@ impl<'a> Parser<'a> {
                                 "Expect variable name".to_string())?;
 
         let initializer = if self.match_token(|x| {Token::is_equal(x)}) {
-            *(self.expression()?)
+            self.expression()?
         }
         else {
             Expr::Empty
@@ -262,7 +255,7 @@ impl<'a> Parser<'a> {
     fn print_statement(&mut self) -> StatementResult {
         let value = self.expression()?;
         self.consume(Token::is_semicolon, "Expected ; after value".to_string())?;
-        let new_print = Print{expression: *value};
+        let new_print = Print{expression: value};
         Ok(
             Stmt::Print(Box::new(new_print))
         )
@@ -273,7 +266,7 @@ impl<'a> Parser<'a> {
         self.consume(Token::is_semicolon, "Expected ; after expression".to_string())?;
         Ok(
             Stmt::Expression(Box::new(
-                Expression{expression: *value}
+                Expression{expression: value}
             )
             )
         )

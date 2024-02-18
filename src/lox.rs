@@ -13,7 +13,7 @@ use crate::lox::ast::expression::{Accept, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::Interpreter;
-use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Stmt, Var};
+use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Var};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -231,7 +231,7 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                     }
                 }
                 Err(err) => {
-                    let (a, b) = err;
+                    let (_, b) = err;
                     println!("Parse Error: {}", b);
                 }
             }
