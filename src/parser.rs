@@ -1,6 +1,6 @@
 use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
-use crate::lox::ast::statement::{Print, Expression, Stmt};
+use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -74,7 +74,7 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Result<Vec<Stmt>, ParserError> {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?)
+            statements.push(self.declaration()?)
         }
         Ok(statements)
     }
@@ -190,15 +190,24 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(|x|{
-            Token::is_number(x) || Token::is_string(x)
+            Token::is_number(x) || Token::is_string(x) || Token::is_identifier(x)
         }) {
             let previous = self.previous();
             let value = match previous {
                 Token::String(x) => LiteralValue::String(x.lexeme.clone()),
                 Token::Number(x) => LiteralValue::Number(x.value),
+                Token::Identifier(x) => LiteralValue::String(x.lexeme.clone()),
                 _ => panic!("Error")
             };
             return Ok(Box::new(Expr::Literal(Box::new(ast::expression::Literal{value}))));
+        }
+
+        if self.match_token(|x|{ Token::is_identifier(x)}) {
+            let previous = self.previous();
+            if let Token::Identifier(x) = previous {
+                return Ok(Box::new(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()}))));
+            };
+
         }
 
         if self.match_token(Token::is_leftparen) {
@@ -213,6 +222,34 @@ impl<'a> Parser<'a> {
     //
     // Statement tree
     //
+    fn declaration(&mut self) -> StatementResult {
+        if self.match_token( |x| {
+            Token::is_var(x)
+        }) {
+            return self.var_declaration();
+        }
+        self.statement()
+        // If there was an error synchronize
+    }
+
+    fn var_declaration(&mut self) -> StatementResult {
+        let name = self.consume(Token::is_identifier,
+                                "Expect variable name".to_string())?;
+
+        let initializer = if self.match_token(|x| {Token::is_equal(x)}) {
+            *(self.expression()?)
+        }
+        else {
+            Expr::Empty
+        };
+        self.consume(Token::is_semicolon, "Expect ';' after variable declaration.".to_string())?;
+        Ok(
+            Stmt::Var(
+                Box::new(Var {name, initializer})
+            )
+        )
+    }
+
     fn statement(&mut self) -> StatementResult {
         if self.match_token( |x| {
             Token::is_print(x)

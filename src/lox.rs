@@ -9,11 +9,11 @@ use std::io::{Read, Write};
 extern crate lox_derive;
 extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
-use crate::lox::ast::expression::{Accept, LiteralValue};
+use crate::lox::ast::expression::{Accept, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::Interpreter;
-use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Stmt};
+use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Stmt, Var};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -118,7 +118,7 @@ pub enum Token {
 
 pub mod ast {
     pub mod expression{
-        use crate::lox::Token;
+        use crate::lox::{Token, TokenTextValueMetadata};
         use lox_derive_ast::derive_ast;
 
         #[derive(Clone, Debug)]
@@ -135,17 +135,20 @@ pub mod ast {
             Grouping : Expr expression;
             Literal : LiteralValue value;
             Unary : Token operator, Expr right;
+            Variable: TokenTextValueMetadata name;
         );
     }
     pub mod statement{
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
+        use crate::lox::Token;
         type Expr = expression::Expr;
 
         derive_ast!(
             Stmt/Stmt/
             Expression : Expr expression;
             Print : Expr expression;
+            Var : Token name, Expr initializer;
         );
     }
 }
@@ -181,6 +184,10 @@ impl ast::expression::AstVisitor<String> for PrettyPrinter
     fn visit_unary(&mut self, visitor: &ast::expression::Unary) -> String {
         format!("(unary {} {}  )", visitor.operator.to_string(), visitor.right.accept(self))
     }
+
+    fn visit_variable(&mut self, visitor: &Variable) -> String {
+        todo!()
+    }
 }
 
 struct PrintStatements {
@@ -201,6 +208,10 @@ impl ast::statement::StmtVisitor<String> for PrintStatements {
 
     fn visit_print(&mut self, print: &Print) -> String {
         format!("Print Statement: {} ", print.expression.accept(&mut self.expr_printer))
+    }
+
+    fn visit_var(&mut self, visitor: &Var) -> String {
+        todo!()
     }
 }
 

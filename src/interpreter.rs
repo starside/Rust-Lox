@@ -1,6 +1,6 @@
 use crate::lox::{Token};
-use crate::lox::ast::expression::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary};
-use crate::lox::ast::statement::{Expression, Print, StmtVisitor};
+use crate::lox::ast::expression::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
+use crate::lox::ast::statement::{Expression, Print, StmtVisitor, Var};
 
 pub struct Interpreter;
 
@@ -49,6 +49,10 @@ impl StmtVisitor<Result<(), String>> for Interpreter
             }
         }
         Ok(())
+    }
+
+    fn visit_var(&mut self, visitor: &Var) -> Result<(), String> {
+        todo!()
     }
 }
 
@@ -131,5 +135,9 @@ impl AstVisitor<RunValue> for Interpreter {
         };
 
         value
+    }
+
+    fn visit_variable(&mut self, visitor: &Variable) -> RunValue {
+        todo!()
     }
 }
