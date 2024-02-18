@@ -1,14 +1,15 @@
-use crate::lox::{ast, Token};
-use crate::lox::ast::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary};
+use crate::lox::{Token};
+use crate::lox::ast::expression::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary};
+use crate::lox::ast::statement::{Expression, Print, StmtVisitor};
 
 pub struct Interpreter;
 
-type RunValue = Result<ast::LiteralValue, String>;
+type RunValue = Result<LiteralValue, String>;
 
-fn is_truthy(value: &ast::LiteralValue) -> bool {
+fn is_truthy(value: &LiteralValue) -> bool {
     match value {
-        ast::LiteralValue::Nil => false,
-        ast::LiteralValue::Boolean(b) => *b,
+        LiteralValue::Nil => false,
+        LiteralValue::Boolean(b) => *b,
         _ => true
     }
 }
@@ -21,6 +22,17 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
         (LiteralValue::Number(a), LiteralValue::Number(b)) => {a == b}
         (LiteralValue::String(a), LiteralValue::String(b)) => {a == b}
         (_, _) => {false}
+    }
+}
+
+impl StmtVisitor<RunValue> for Interpreter
+{
+    fn visit_expression(&mut self, visitor: &Expression) -> RunValue {
+        todo!()
+    }
+
+    fn visit_print(&mut self, visitor: &Print) -> RunValue {
+        todo!()
     }
 }
 
@@ -88,8 +100,8 @@ impl AstVisitor<RunValue> for Interpreter {
 
         let value = match visitor.operator {
             Token::Minus(_) => {
-                if let ast::LiteralValue::Number(x) = right {
-                    Ok(ast::LiteralValue::Number(-x))
+                if let LiteralValue::Number(x) = right {
+                    Ok(LiteralValue::Number(-x))
                 }
                 else {
                     Err("Unary minus must operate on a number".to_string())
@@ -97,7 +109,7 @@ impl AstVisitor<RunValue> for Interpreter {
             }
 
             Token::Bang(_) => {
-                Ok(ast::LiteralValue::Boolean(!is_truthy(&right)))
+                Ok(LiteralValue::Boolean(!is_truthy(&right)))
             }
             _ => Err("Unknown unary operator".to_string())
         };

@@ -8,10 +8,11 @@ use std::io::{Write};
 extern crate lox_derive;
 extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
-use crate::lox::ast::{Accept, LiteralValue};
+use crate::lox::ast::expression::{Accept, LiteralValue};
 use crate::parser::Parser;
-use crate::{lox, scanner};
+use crate::{scanner};
 use crate::interpreter::Interpreter;
+use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -115,26 +116,40 @@ pub enum Token {
 }
 
 pub mod ast {
-    use crate::lox::Token;
-    use lox_derive_ast::derive_ast;
+    pub mod expression{
+        use crate::lox::Token;
+        use lox_derive_ast::derive_ast;
+        use crate::lox::ast::ExprBox;
 
-    #[derive(Clone, Debug)]
-    pub enum LiteralValue {
-        String(String),
-        Number(f64),
-        Boolean(bool),
-        Nil
+        #[derive(Clone, Debug)]
+        pub enum LiteralValue {
+            String(String),
+            Number(f64),
+            Boolean(bool),
+            Nil
+        }
+
+        derive_ast!(
+            Ast/Expr/
+            Binary : ExprBox left, Token operator, ExprBox right;
+            Grouping : ExprBox expression;
+            Literal : LiteralValue value;
+            Unary : Token operator, ExprBox right;
+        );
+    }
+    pub mod statement{
+        use lox_derive_ast::derive_ast;
+        use crate::lox::ast::{expression};
+        type Expr = expression::Expr;
+
+        derive_ast!(
+            Stmt/Stmt/
+            Expression : Expr expression;
+            Print : Expr expression;
+        );
     }
 
-    derive_ast!(
-        Ast/Expr/
-        Binary : ExprBox left, Token operator, ExprBox right;
-        Grouping : ExprBox expression;
-        Literal : LiteralValue value;
-        Unary : Token operator, ExprBox right;
-    );
-
-    type ExprBox = Box<Expr>;
+    type ExprBox = Box<expression::Expr>;
 }
 
 impl fmt::Display for Token {
@@ -145,17 +160,17 @@ impl fmt::Display for Token {
 }
 
 struct PrettyPrinter;
-impl lox::ast::AstVisitor<String> for PrettyPrinter
+impl ast::expression::AstVisitor<String> for PrettyPrinter
 {
-    fn visit_binary(&mut self, visitor: &lox::ast::Binary) -> String {
+    fn visit_binary(&mut self, visitor: &ast::expression::Binary) -> String {
         format!("(binary {} {} {})", visitor.left.accept(self), visitor.operator.to_string(), visitor.right.accept(self))
     }
 
-    fn visit_grouping(&mut self, visitor: &lox::ast::Grouping) -> String {
+    fn visit_grouping(&mut self, visitor: &ast::expression::Grouping) -> String {
         format!("(grouping {})", visitor.expression.accept(self))
     }
 
-    fn visit_literal(&mut self, visitor: &lox::ast::Literal) -> String {
+    fn visit_literal(&mut self, visitor: &ast::expression::Literal) -> String {
         let lv = match &visitor.value {
             LiteralValue::String(x) => {x.to_string()}
             LiteralValue::Number(x) => {x.to_string()}
@@ -165,8 +180,29 @@ impl lox::ast::AstVisitor<String> for PrettyPrinter
         format!("(literal {})", lv)
     }
 
-    fn visit_unary(&mut self, visitor: &lox::ast::Unary) -> String {
+    fn visit_unary(&mut self, visitor: &ast::expression::Unary) -> String {
         format!("(unary {} {}  )", visitor.operator.to_string(), visitor.right.accept(self))
+    }
+}
+
+struct PrintStatements {
+    expr_printer: PrettyPrinter
+}
+
+impl PrintStatements {
+    fn new() -> Self {
+        PrintStatements {
+            expr_printer: PrettyPrinter
+        }
+    }
+}
+impl ast::statement::StmtVisitor<String> for PrintStatements {
+    fn visit_expression(&mut self, expr: &Expression) -> String {
+        format!("Expression Statement: {} ", expr.expression.accept(&mut self.expr_printer))
+    }
+
+    fn visit_print(&mut self, print: &Print) -> String {
+        format!("Print Statement: {} ", print.expression.accept(&mut self.expr_printer))
     }
 }
 
@@ -177,7 +213,7 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
     match tokens {
         Ok(tokens) => {
             let mut parser = Parser::new(tokens);
-            if let Ok(pe) = parser.parse()
+            /*if let Ok(pe) = parser.parse()
             {
                 let mut pp = PrettyPrinter;
                 let mut ip = Interpreter;
@@ -192,6 +228,12 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                     Err(v) => {
                         println!("Runtime Error {}", v);
                     }
+                }
+            }*/
+            if let Ok(statements) = parser.parse_statements(){
+                let mut pp = PrintStatements::new();
+                for s in statements {
+                    println!("{}", s.accept(&mut pp));
                 }
             }
             else {
