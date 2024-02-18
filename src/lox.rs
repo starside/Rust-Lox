@@ -231,9 +231,9 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                 }
             }*/
             if let Ok(statements) = parser.parse_statements(){
-                let mut pp = PrintStatements::new();
+                let mut ip = Interpreter;
                 for s in statements {
-                    println!("{}", s.accept(&mut pp));
+                    s.accept(&mut ip).expect("TODO: panic message");
                 }
             }
             else {

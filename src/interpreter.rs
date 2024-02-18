@@ -25,14 +25,30 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
     }
 }
 
-impl StmtVisitor<RunValue> for Interpreter
+impl StmtVisitor<Result<(), String>> for Interpreter
 {
-    fn visit_expression(&mut self, visitor: &Expression) -> RunValue {
-        todo!()
+    fn visit_expression(&mut self, expression: &Expression) -> Result<(), String> {
+        expression.expression.accept(self)?;
+        Ok(())
     }
 
-    fn visit_print(&mut self, visitor: &Print) -> RunValue {
-        todo!()
+    fn visit_print(&mut self, print: &Print) -> Result<(), String> {
+        let value = print.expression.accept(self)?;
+        match value {
+            LiteralValue::String(x) => {
+                println!("{}", x);
+            }
+            LiteralValue::Number(x) => {
+                println!("{}", x);
+            }
+            LiteralValue::Boolean(x) => {
+                println!("{}", x);
+            }
+            LiteralValue::Nil => {
+                println!("Nil");
+            }
+        }
+        Ok(())
     }
 }
 
