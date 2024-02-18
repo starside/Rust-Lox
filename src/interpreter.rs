@@ -1,10 +1,43 @@
-use crate::lox::{Token};
+use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
 use crate::lox::ast::statement::{Expression, Print, StmtVisitor, Var};
-
-pub struct Interpreter;
+use std::collections::HashMap;
 
 type RunValue = Result<LiteralValue, String>;
+
+// Environment to store variables at some level of scope
+struct Environment {
+    values: HashMap<String, LiteralValue>
+}
+
+impl Environment {
+
+    pub fn new() -> Self {
+        Environment {values: HashMap::new()}
+    }
+    pub fn define(&mut self, name: &String, value: &LiteralValue) {
+        self.values.insert(name.clone(), value.clone());
+    }
+
+    pub fn get(&mut self, name: &str) -> RunValue{
+        match self.values.get(name) {
+            None => {
+                Err(format!("Undefined variable'{}'", name).to_string())
+            }
+            Some(x) => {Ok(x.clone())}
+        }
+    }
+}
+
+pub struct Interpreter {
+    environment: Environment
+}
+
+impl<'a> Interpreter {
+    pub fn new() -> Self {
+        Interpreter{environment: Environment::new()}
+    }
+}
 
 fn is_truthy(value: &LiteralValue) -> bool {
     match value {
@@ -51,8 +84,17 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_var(&mut self, visitor: &Var) -> Result<(), String> {
-        todo!()
+    fn visit_var(&mut self, stmt: &Var) -> Result<(), String> {
+        let value = match stmt.initializer {
+            ast::expression::Expr::Empty => {
+                LiteralValue::Nil
+            }
+            _ => {
+                stmt.initializer.accept(self)?
+            }
+        };
+        self.environment.define(&stmt.name.lexeme, &value);
+        Ok(())
     }
 }
 
@@ -137,7 +179,9 @@ impl AstVisitor<RunValue> for Interpreter {
         value
     }
 
-    fn visit_variable(&mut self, visitor: &Variable) -> RunValue {
-        todo!()
+    fn visit_variable(&mut self, varname: &Variable) -> RunValue {
+        let res = self.environment.get(&varname.name.lexeme);
+        println!("{:?}", res);
+        res
     }
 }

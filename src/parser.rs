@@ -1,4 +1,4 @@
-use crate::lox::{ast, Token};
+use crate::lox::{ast, Token, TokenTextValueMetadata};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
@@ -183,13 +183,12 @@ impl<'a> Parser<'a> {
         }
 
         if self.match_token(|x|{
-            Token::is_number(x) || Token::is_string(x) || Token::is_identifier(x)
+            Token::is_number(x) || Token::is_string(x)
         }) {
             let previous = self.previous();
             let value = match previous {
                 Token::String(x) => LiteralValue::String(x.lexeme.clone()),
                 Token::Number(x) => LiteralValue::Number(x.value),
-                Token::Identifier(x) => LiteralValue::String(x.lexeme.clone()),
                 _ => panic!("Error")
             };
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value})));
@@ -236,9 +235,15 @@ impl<'a> Parser<'a> {
             Expr::Empty
         };
         self.consume(Token::is_semicolon, "Expect ';' after variable declaration.".to_string())?;
+        let new_id = if let Token::Identifier(x) = name
+        {
+            Box::new(Var {name: x, initializer})
+        } else {
+            panic!("Logic error!")
+        };
         Ok(
             Stmt::Var(
-                Box::new(Var {name, initializer})
+                new_id
             )
         )
     }

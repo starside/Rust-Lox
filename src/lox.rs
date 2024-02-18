@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str;
 use std::io;
 use std::error::Error;
@@ -12,7 +13,7 @@ use lox_derive::EnumStrings;
 use crate::lox::ast::expression::{Accept, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
-use crate::interpreter::Interpreter;
+use crate::interpreter::{Interpreter};
 use crate::lox::ast::statement::{Accept as StatementAccept, Expression, Print, Var};
 
 pub trait EnumVectorize {
@@ -141,14 +142,14 @@ pub mod ast {
     pub mod statement{
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
-        use crate::lox::Token;
+        use crate::lox::TokenTextValueMetadata;
         type Expr = expression::Expr;
 
         derive_ast!(
             Stmt/Stmt/
             Expression : Expr expression;
             Print : Expr expression;
-            Var : Token name, Expr initializer;
+            Var : TokenTextValueMetadata name, Expr initializer;
         );
     }
 }
@@ -223,7 +224,7 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
             let mut parser = Parser::new(tokens);
             match parser.parse() {
                 Ok(statements) => {
-                    let mut interpreter = Interpreter;
+                    let mut interpreter = Interpreter::new();
                     for s in statements {
                         if let Err(err) = s.accept(&mut interpreter) {
                             println!("Runtime Error: {}", err);
