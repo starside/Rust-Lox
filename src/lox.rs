@@ -10,7 +10,7 @@ use std::io::{Read, Write};
 extern crate lox_derive;
 extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
-use crate::lox::ast::expression::{Accept, LiteralValue, Variable};
+use crate::lox::ast::expression::{Accept, Assign, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::{Interpreter};
@@ -132,6 +132,7 @@ pub mod ast {
 
         derive_ast!(
             Ast/Expr/
+            Assign: Token name, Expr value;
             Binary : Expr left, Token operator, Expr right;
             Grouping : Expr expression;
             Literal : LiteralValue value;
@@ -164,6 +165,10 @@ impl fmt::Display for Token {
 struct PrettyPrinter;
 impl ast::expression::AstVisitor<String> for PrettyPrinter
 {
+    fn visit_assign(&mut self, visitor: &Assign) -> String {
+        todo!()
+    }
+
     fn visit_binary(&mut self, visitor: &ast::expression::Binary) -> String {
         format!("(binary {} {} {})", visitor.left.accept(self), visitor.operator.to_string(), visitor.right.accept(self))
     }

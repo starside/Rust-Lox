@@ -97,6 +97,28 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    fn assignment(&mut self) -> ParserResult {
+        let expr = self.equality()?;
+        let is_equal = self.match_token(|x| Token::is_equal(x));
+        if  is_equal {
+            let equals = self.previous().clone();
+            let value = self.assignment()?;
+            let r = match &expr {
+                Expr::Variable(x) => {
+                    Ok(Expr::Assign(
+                        Box::new(ast::expression::Assign{name: Token::Identifier(x.name.clone()), value })
+                    ))
+                }
+                _ => {
+                    Err(self.error(&equals, "Invalid target assignment".to_string()))
+                }
+            };
+            return r;
+        }
+
+        Ok(expr)
+    }
+
     fn equality(&mut self) -> ParserResult {
         let mut left = self.comparison()?;
 
@@ -115,7 +137,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self) -> ParserResult {
-        self.equality()
+        self.assignment()
     }
 
 

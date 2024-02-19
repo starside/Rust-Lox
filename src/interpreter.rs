@@ -1,5 +1,5 @@
 use crate::lox::{ast, Token};
-use crate::lox::ast::expression::{Accept, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
 use crate::lox::ast::statement::{Expression, Print, StmtVisitor, Var};
 use std::collections::HashMap;
 
@@ -17,6 +17,16 @@ impl Environment {
     }
     pub fn define(&mut self, name: &String, value: &LiteralValue) {
         self.values.insert(name.clone(), value.clone());
+    }
+
+    pub fn assign(&mut self, name: &String, value: &LiteralValue) -> Result<(),String> {
+        let name = name.clone();
+        if !self.values.contains_key(&name) {
+            return Err(format!("L-value {} is not defined but was assigned to", &name).to_string());
+        }
+
+        self.values.insert(name, value.clone());
+        Ok(())
     }
 
     pub fn get(&mut self, name: &str) -> RunValue{
@@ -99,6 +109,16 @@ impl StmtVisitor<Result<(), String>> for Interpreter
 }
 
 impl AstVisitor<RunValue> for Interpreter {
+    fn visit_assign(&mut self, expr: &Assign) -> RunValue {
+        let value = expr.value.accept(self)?;
+        if let Token::Identifier(m) = &expr.name {
+            self.environment.assign(&m.lexeme, &value)?;
+            return Ok(value);
+        }
+
+        panic!("Logic error") // Can I change the data structures to avoid this logic error?
+    }
+
     fn visit_binary(&mut self, visitor: &Binary) -> RunValue {
         let left = visitor.left.accept(self)?;
         let right = visitor.right.accept(self)?;
