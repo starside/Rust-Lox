@@ -276,7 +276,23 @@ impl<'a> Parser<'a> {
         }) {
             return self.print_statement();
         }
+        if self.match_token( |x| {
+            Token::is_leftbrace(x)
+        }) {
+            return self.block();
+        }
         self.expression_statement()
+    }
+
+    fn block(&mut self) -> StatementResult {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.check(Token::is_rightbrace) && !self.is_at_end() {
+            statements.push(self.declaration()?)
+        }
+        self.consume(Token::is_rightbrace, "Expect '}' after block.".to_string())?;
+        Ok(
+            Stmt::Block(Box::new(ast::statement::Block { statements }))
+        )
     }
 
     fn print_statement(&mut self) -> StatementResult {

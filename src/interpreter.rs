@@ -1,41 +1,63 @@
 use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
-use crate::lox::ast::statement::{Expression, Print, StmtVisitor, Var};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Print, StmtVisitor, Var};
 use std::collections::HashMap;
 
 type RunValue = Result<LiteralValue, String>;
 
 // Environment to store variables at some level of scope
 struct Environment {
-    values: HashMap<String, LiteralValue>
+    values: Vec<HashMap<String, LiteralValue>>
 }
 
 impl Environment {
 
     pub fn new() -> Self {
-        Environment {values: HashMap::new()}
+        let mut e = Environment {values: Vec::new()};
+        e.values.push(HashMap::new());
+        e
     }
+
+    pub fn push_frame(&mut self) {
+        self.values.push(HashMap::new());
+    }
+
+    pub fn pop_frame(&mut self) {
+        self.values.pop();
+    }
+
+    fn current_frame(&mut self) -> &mut HashMap<String, LiteralValue> {
+        self.values.last_mut().unwrap()
+    }
+
     pub fn define(&mut self, name: &String, value: &LiteralValue) {
-        self.values.insert(name.clone(), value.clone());
+        self.current_frame().insert(name.clone(), value.clone());
     }
 
     pub fn assign(&mut self, name: &String, value: &LiteralValue) -> Result<(),String> {
         let name = name.clone();
-        if !self.values.contains_key(&name) {
+
+        if let Some(scope) =
+            self.values.iter_mut().rfind(|x| x.contains_key(&name))
+        {
+            scope.insert(name, value.clone());
+        }
+        else {
             return Err(format!("L-value {} is not defined but was assigned to", &name).to_string());
         }
 
-        self.values.insert(name, value.clone());
         Ok(())
     }
 
     pub fn get(&mut self, name: &str) -> RunValue{
-        match self.values.get(name) {
-            None => {
-                Err(format!("Undefined variable'{}'", name).to_string())
-            }
-            Some(x) => {Ok(x.clone())}
+        for scope in self.values.iter().rev()
+        {
+            if let Some(x) = scope.get(name) {
+                return Ok(x.clone());
+            };
+
         }
+        Err(format!("Undefined variable'{}'", name).to_string())
     }
 }
 
@@ -70,6 +92,15 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
 
 impl StmtVisitor<Result<(), String>> for Interpreter
 {
+    fn visit_block(&mut self, block: &Block) -> Result<(), String> {
+        self.environment.push_frame();
+        for statement in block.statements.iter() {
+            statement.accept(self)?
+        }
+        self.environment.pop_frame();
+        Ok(())
+    }
+
     fn visit_expression(&mut self, expression: &Expression) -> Result<(), String> {
         expression.expression.accept(self)?;
         Ok(())
@@ -201,7 +232,6 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
         let res = self.environment.get(&varname.name.lexeme);
-        println!("{:?}", res);
         res
     }
 }
