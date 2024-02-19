@@ -14,7 +14,7 @@ use crate::lox::ast::expression::{Accept, Assign, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::{Interpreter};
-use crate::lox::ast::statement::{Accept as StatementAccept, Block, Expression, Print, Var};
+use crate::lox::ast::statement::{Accept as StatementAccept, Block, Expression, If, Print, Var};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;
@@ -150,6 +150,7 @@ pub mod ast {
             Stmt/Stmt/
             Block: StmtList statements;
             Expression : Expr expression;
+            If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
             Var : TokenTextValueMetadata name, Expr initializer;
         );
@@ -217,6 +218,10 @@ impl ast::statement::StmtVisitor<String> for PrintStatements {
 
     fn visit_expression(&mut self, expr: &Expression) -> String {
         format!("Expression Statement: {} ", expr.expression.accept(&mut self.expr_printer))
+    }
+
+    fn visit_if(&mut self, ifstmt: &If) -> String {
+        todo!()
     }
 
     fn visit_print(&mut self, print: &Print) -> String {

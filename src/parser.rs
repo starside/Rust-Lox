@@ -1,3 +1,4 @@
+use clap::error::ErrorKind::TooFewValues;
 use crate::lox::{ast, Token, TokenTextValueMetadata};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
@@ -236,6 +237,33 @@ impl<'a> Parser<'a> {
     //
     // Statement tree
     //
+    fn if_statement(&mut self) -> StatementResult {
+        self.consume(Token::is_leftparen, "Expect '(' after 'if'.".to_string())?;
+        let condition = self.expression()?;
+        self.consume(Token::is_rightparen, "Expect ')' after 'if' condition.".to_string())?;
+
+        let then_branch = self.statement()?;
+        let else_branch =
+            if self.match_token(Token::is_else) {
+                self.statement()?
+            } else {
+                Stmt::Empty
+            };
+
+        Ok(
+            Stmt::If(
+                Box::new(
+                    ast::statement::If {
+                        condition,
+                        then_branch,
+                        else_branch,
+                    }
+                )
+            )
+        )
+    }
+
+
     fn declaration(&mut self) -> StatementResult {
         if self.match_token( |x| {
             Token::is_var(x)
@@ -271,14 +299,13 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> StatementResult {
-        if self.match_token( |x| {
-            Token::is_print(x)
-        }) {
+        if self.match_token(Token::is_if) {
+            return self.if_statement();
+        }
+        if self.match_token(Token::is_print) {
             return self.print_statement();
         }
-        if self.match_token( |x| {
-            Token::is_leftbrace(x)
-        }) {
+        if self.match_token(Token::is_leftbrace) {
             return self.block();
         }
         self.expression_statement()
