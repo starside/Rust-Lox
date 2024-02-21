@@ -1,5 +1,5 @@
 use crate::lox::{ast, Token};
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var};
 use std::collections::HashMap;
 
@@ -217,6 +217,29 @@ impl AstVisitor<RunValue> for Interpreter {
     fn visit_literal(&mut self, visitor: &Literal) -> RunValue {
         Ok(visitor.value.clone())
     }
+
+    fn visit_logical(&mut self, logical: &Logical) -> RunValue {
+        let left = logical.left.accept(self)?;
+
+        match logical.operator {
+            Token::And(_) => {
+                if !is_truthy(&left) {
+                    return Ok(left);
+                }
+            }
+            Token::Or(_) => {
+                if is_truthy(&left) {
+                    return Ok(left);
+                }
+            }
+            _ => {
+                panic!("Logic error")
+            }
+        }
+
+        logical.right.accept(self)
+    }
+
     fn visit_unary(&mut self, visitor: &Unary) -> RunValue {
         let right = visitor.right.accept(self)?;
 

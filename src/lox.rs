@@ -136,6 +136,7 @@ pub mod ast {
             Binary : Expr left, Token operator, Expr right;
             Grouping : Expr expression;
             Literal : LiteralValue value;
+            Logical :  Expr left, Token operator, Expr right;
             Unary : Token operator, Expr right;
             Variable: TokenTextValueMetadata name;
         );
@@ -163,73 +164,6 @@ impl fmt::Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let v: Vec<String> = self.enum_to_vector();
         write!(f, "{}", v.join(" "))
-    }
-}
-
-struct PrettyPrinter;
-impl ast::expression::AstVisitor<String> for PrettyPrinter
-{
-    fn visit_assign(&mut self, visitor: &Assign) -> String {
-        todo!()
-    }
-
-    fn visit_binary(&mut self, visitor: &ast::expression::Binary) -> String {
-        format!("(binary {} {} {})", visitor.left.accept(self), visitor.operator.to_string(), visitor.right.accept(self))
-    }
-
-    fn visit_grouping(&mut self, visitor: &ast::expression::Grouping) -> String {
-        format!("(grouping {})", visitor.expression.accept(self))
-    }
-
-    fn visit_literal(&mut self, visitor: &ast::expression::Literal) -> String {
-        let lv = match &visitor.value {
-            LiteralValue::String(x) => {x.to_string()}
-            LiteralValue::Number(x) => {x.to_string()}
-            LiteralValue::Boolean(b) => {b.to_string()}
-            LiteralValue::Nil => {"Nil".to_string()}
-        };
-        format!("(literal {})", lv)
-    }
-
-    fn visit_unary(&mut self, visitor: &ast::expression::Unary) -> String {
-        format!("(unary {} {}  )", visitor.operator.to_string(), visitor.right.accept(self))
-    }
-
-    fn visit_variable(&mut self, visitor: &Variable) -> String {
-        todo!()
-    }
-}
-
-struct PrintStatements {
-    expr_printer: PrettyPrinter
-}
-
-impl PrintStatements {
-    fn new() -> Self {
-        PrintStatements {
-            expr_printer: PrettyPrinter
-        }
-    }
-}
-impl ast::statement::StmtVisitor<String> for PrintStatements {
-    fn visit_block(&mut self, visitor: &Block) -> String {
-        todo!()
-    }
-
-    fn visit_expression(&mut self, expr: &Expression) -> String {
-        format!("Expression Statement: {} ", expr.expression.accept(&mut self.expr_printer))
-    }
-
-    fn visit_if(&mut self, ifstmt: &If) -> String {
-        todo!()
-    }
-
-    fn visit_print(&mut self, print: &Print) -> String {
-        format!("Print Statement: {} ", print.expression.accept(&mut self.expr_printer))
-    }
-
-    fn visit_var(&mut self, visitor: &Var) -> String {
-        todo!()
     }
 }
 
