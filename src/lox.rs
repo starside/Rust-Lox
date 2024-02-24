@@ -154,6 +154,7 @@ pub mod ast {
             If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
             Var : TokenTextValueMetadata name, Expr initializer;
+            While : Expr condition, Stmt body;
         );
 
         type StmtList = Vec<Stmt>;

@@ -273,6 +273,24 @@ impl<'a> Parser<'a> {
     //
     // Statement tree
     //
+
+    fn while_statement(&mut self) -> StatementResult {
+        self.consume(Token::is_leftparen, "Expect '(' after 'while'".to_string())?;
+        let condition = self.expression()?;
+        self.consume(Token::is_rightparen, "Expect ')' after 'whiile' condition.".to_string())?;
+        let body = self.statement()?;
+        Ok(
+            Stmt::While(
+                Box::new(
+                    ast::statement::While {
+                        condition,
+                        body
+                    }
+                )
+            )
+        )
+    }
+
     fn if_statement(&mut self) -> StatementResult {
         self.consume(Token::is_leftparen, "Expect '(' after 'if'.".to_string())?;
         let condition = self.expression()?;
@@ -343,6 +361,9 @@ impl<'a> Parser<'a> {
         }
         if self.match_token(Token::is_leftbrace) {
             return self.block();
+        }
+        if self.match_token(Token::is_while) {
+            return self.while_statement();
         }
         self.expression_statement()
     }

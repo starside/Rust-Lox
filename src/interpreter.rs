@@ -1,6 +1,6 @@
 use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
 
 type RunValue = Result<LiteralValue, String>;
@@ -144,6 +144,13 @@ impl StmtVisitor<Result<(), String>> for Interpreter
             }
         };
         self.environment.define(&stmt.name.lexeme, &value);
+        Ok(())
+    }
+
+    fn visit_while(&mut self, whilestmt: &While) -> Result<(), String> {
+        while is_truthy(&whilestmt.condition.accept(self)?) {
+            whilestmt.body.accept(self)?;
+        }
         Ok(())
     }
 }
