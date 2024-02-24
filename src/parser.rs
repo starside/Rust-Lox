@@ -40,7 +40,7 @@ impl<'a> Parser<'a> {
         self.previous().clone()
     }
 
-    fn check<F>(&mut self, match_type: F) -> bool
+    fn check<F>(&self, match_type: F) -> bool
         where F: Fn(&Token) -> bool {
         if self.is_at_end() {
             return false;
@@ -291,6 +291,103 @@ impl<'a> Parser<'a> {
         )
     }
 
+    fn for_statement(&mut self) -> StatementResult {
+        self.consume(Token::is_leftparen, "Expect '(' after 'for'.".to_string())?;
+
+        // Read initializer
+        let initializer = if self.match_token(Token::is_semicolon) {
+            None
+        } else if self.match_token(Token::is_var) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        // Read Condition.
+        let condition = if !self.check(Token::is_semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(Token::is_semicolon, "Expect ';' after loop condition.".to_string());
+
+        // Read increment
+        let increment = if !self.check(Token::is_rightparen) {
+            Some(
+                Stmt::Expression(
+                    Box::new(
+                        Expression {
+                            expression: self.expression()?
+                        }
+                    )
+                )
+            )
+        } else {
+            None
+        };
+        self.consume(Token::is_rightparen, "Expect ')' after 'for' clauses.".to_string())?;
+
+        let for_body = self.statement()?;
+
+        /*
+            { // Block A
+              <initializer>
+              while (<condition>)
+              { // Block B
+                <for_body>
+                <increment>
+              }
+            }
+         */
+
+        let condition = if let Some(x) = condition {
+            x
+        } else {
+            Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)}))
+        };
+
+        // Build while body.  First for_body, followed by optional increment
+        let mut while_body: Vec<Stmt> = Vec::new();
+        while_body.push(for_body);
+        if let Some(x) = increment {
+            while_body.push(x);
+        }
+
+        let while_body = Stmt::Block(
+            Box::new(
+                ast::statement::Block {
+                    statements: while_body
+                }
+            )
+        );
+
+        let while_loop = Stmt::While(
+            Box::new(
+                ast::statement::While {
+                    condition,
+                    body: while_body
+                }
+            )
+        );
+
+        // Construct block A
+        let mut statements: Vec<Stmt> = Vec::new();
+        if let Some(x) = initializer {
+            statements.push(x);
+        }
+        statements.push(while_loop);
+
+        Ok(
+            Stmt::Block(
+                Box::new(
+                    ast::statement::Block {
+                        statements
+                    }
+                )
+            )
+        )
+    }
+
     fn if_statement(&mut self) -> StatementResult {
         self.consume(Token::is_leftparen, "Expect '(' after 'if'.".to_string())?;
         let condition = self.expression()?;
@@ -364,6 +461,9 @@ impl<'a> Parser<'a> {
         }
         if self.match_token(Token::is_while) {
             return self.while_statement();
+        }
+        if self.match_token(Token::is_for) {
+            return self.for_statement();
         }
         self.expression_statement()
     }
