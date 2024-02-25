@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str;
 use std::io;
 use std::error::Error;
@@ -10,11 +9,10 @@ use std::io::{Read, Write};
 extern crate lox_derive;
 extern crate lox_derive_ast;
 use lox_derive::EnumStrings;
-use crate::lox::ast::expression::{Accept, Assign, LiteralValue, Variable};
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::{Interpreter};
-use crate::lox::ast::statement::{Accept as StatementAccept, Block, Expression, If, Print, Var};
+use crate::lox::ast::statement::{Accept as StatementAccept};
 
 pub trait EnumVectorize {
     fn enum_to_vector(&self) -> Vec<String>;

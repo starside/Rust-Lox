@@ -1,5 +1,4 @@
-use clap::error::ErrorKind::TooFewValues;
-use crate::lox::{ast, Token, TokenTextValueMetadata};
+use crate::lox::{ast, Token};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
@@ -309,7 +308,7 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        self.consume(Token::is_semicolon, "Expect ';' after loop condition.".to_string());
+        self.consume(Token::is_semicolon, "Expect ';' after loop condition.".to_string())?;
 
         // Read increment
         let increment = if !self.check(Token::is_rightparen) {
