@@ -3,8 +3,6 @@ mod scanner;
 mod parser;
 mod interpreter;
 
-extern crate lox_derive;
-
 use std::error::Error;
 use crate::lox::{run_prompt, run_file};
 use clap;

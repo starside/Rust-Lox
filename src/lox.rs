@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use enum_kinds::EnumKind;
 
-extern crate lox_derive;
 extern crate lox_derive_ast;
 use crate::parser::Parser;
 use crate::{scanner};
