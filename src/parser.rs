@@ -1,4 +1,4 @@
-use crate::lox::{ast, Token};
+use crate::lox::{ast, Token, TokenKind};
 use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
@@ -39,18 +39,19 @@ impl<'a> Parser<'a> {
         self.previous().clone()
     }
 
-    fn check<F>(&self, match_type: F) -> bool
-        where F: Fn(&Token) -> bool {
+    fn check(&self, match_types: &[TokenKind]) -> bool
+    {
         if self.is_at_end() {
             return false;
         }
 
-        match_type(self.peek())
+        match_types.contains(&TokenKind::from(self.peek()))
     }
-    fn consume<F>(&mut self, match_type: F, error_message: String) ->  Result<Token, ParserError>
-        where F: Fn(&Token) -> bool {
 
-        if self.check(match_type) {
+    fn consume(&mut self, match_type: TokenKind, error_message: String) ->  Result<Token, ParserError>
+    {
+
+        if self.check(&[match_type]) {
             return Ok(self.advance());
         }
 
@@ -62,9 +63,9 @@ impl<'a> Parser<'a> {
         (token.clone(), message)
     }
 
-    fn match_token<F>(&mut self, match_type: F) -> bool
-        where F: Fn(&Token) -> bool {
-        if self.check(match_type) {
+    fn match_token(&mut self, match_types: &[TokenKind]) -> bool
+    {
+        if self.check(match_types) {
             self.advance();
             return true;
         }
@@ -83,9 +84,8 @@ impl<'a> Parser<'a> {
     {
         let mut left = self.term()?;
 
-        while self.match_token(|x| {
-            Token::is_greater(x) || Token::is_greaterequal(x) || Token::is_less(x) || Token::is_lessequal(x)
-        }) {
+        while self.match_token(
+            &[TokenKind::Greater, TokenKind::GreaterEqual, TokenKind::LessEqual, TokenKind::Less]) {
             let operator = self.previous().clone();
             let right = self.term()?;
             left =
@@ -99,7 +99,7 @@ impl<'a> Parser<'a> {
 
     fn assignment(&mut self) -> ParserResult {
         let expr = self.or()?;
-        let is_equal = self.match_token(|x| Token::is_equal(x));
+        let is_equal = self.match_token(&[TokenKind::Equal]);
         if  is_equal {
             let equals = self.previous().clone();
             let value = self.assignment()?;
@@ -121,7 +121,7 @@ impl<'a> Parser<'a> {
 
     fn or(&mut self) -> ParserResult {
         let mut expr = self.and()?;
-        while self.match_token(Token::is_or) {
+        while self.match_token(&[TokenKind::Or]) {
             let operator = self.previous().clone();
             let right = self.and()?;
             expr = Expr::Logical(
@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
 
     fn and(&mut self) -> ParserResult {
         let mut expr = self.equality()?;
-        while self.match_token(Token::is_and) {
+        while self.match_token(&[TokenKind::And]) {
             let operator = self.previous().clone();
             let right = self.equality()?;
             expr = Expr::Logical(
@@ -158,9 +158,7 @@ impl<'a> Parser<'a> {
     fn equality(&mut self) -> ParserResult {
         let mut left = self.comparison()?;
 
-        while self.match_token(|x| {
-            Token::is_bangequal(x) || Token::is_equalequal(x)
-        }) {
+        while self.match_token(&[TokenKind::BangEqual, TokenKind::EqualEqual]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
             left =
@@ -181,9 +179,8 @@ impl<'a> Parser<'a> {
     {
         let mut left = self.factor()?;
 
-        while self.match_token(|x| {
-            Token::is_minus(x) || Token::is_plus(x)
-        }) {
+        while self.match_token(
+            &[TokenKind::Minus, TokenKind::Plus]) {
             let operator = self.previous().clone();
             let right = self.factor()?;
             left = Expr::Binary(
@@ -198,9 +195,8 @@ impl<'a> Parser<'a> {
     {
         let mut left = self.unary()?;
 
-        while self.match_token(|x| {
-            Token::is_slash(x) || Token::is_star(x)
-        }) {
+        while self.match_token(
+            &[TokenKind::Slash, TokenKind::Star]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             left = Expr::Binary(
@@ -213,9 +209,8 @@ impl<'a> Parser<'a> {
 
     fn unary(&mut self) -> ParserResult
     {
-        if self.match_token(|x| {
-            Token::is_bang(x) || Token::is_minus(x)
-        }) {
+        if self.match_token(
+            &[TokenKind::Bang, TokenKind::Minus]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary(
@@ -228,21 +223,20 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> ParserResult {
-        if self.match_token(Token::is_false) {
+        if self.match_token(&[TokenKind::False]) {
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(false)})));
         }
 
-        if self.match_token(Token::is_true) {
+        if self.match_token(&[TokenKind::True]) {
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)})));
         }
 
-        if self.match_token(Token::is_nil) {
+        if self.match_token(&[TokenKind::Nil]) {
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Nil})));
         }
 
-        if self.match_token(|x|{
-            Token::is_number(x) || Token::is_string(x)
-        }) {
+        if self.match_token(
+            &[TokenKind::Number, TokenKind::String]) {
             let previous = self.previous();
             let value = match previous {
                 Token::String(x) => LiteralValue::String(x.lexeme.clone()),
@@ -252,7 +246,8 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value})));
         }
 
-        if self.match_token(|x|{ Token::is_identifier(x)}) {
+        if self.match_token(
+            &[TokenKind::Identifier]) {
             let previous = self.previous();
             if let Token::Identifier(x) = previous {
                 return Ok(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()})));
@@ -260,9 +255,9 @@ impl<'a> Parser<'a> {
 
         }
 
-        if self.match_token(Token::is_leftparen) {
+        if self.match_token(&[TokenKind::LeftParen]) {
             let expr = self.expression()?;
-            self.consume(Token::is_rightparen, "Expected )".to_string())?;
+            self.consume(TokenKind::RightParen, "Expected )".to_string())?;
             return Ok(Expr::Grouping(Box::new(ast::expression::Grouping{expression: expr})));
         }
 
@@ -274,9 +269,9 @@ impl<'a> Parser<'a> {
     //
 
     fn while_statement(&mut self) -> StatementResult {
-        self.consume(Token::is_leftparen, "Expect '(' after 'while'".to_string())?;
+        self.consume(TokenKind::LeftParen, "Expect '(' after 'while'".to_string())?;
         let condition = self.expression()?;
-        self.consume(Token::is_rightparen, "Expect ')' after 'whiile' condition.".to_string())?;
+        self.consume(TokenKind::RightParen, "Expect ')' after 'whiile' condition.".to_string())?;
         let body = self.statement()?;
         Ok(
             Stmt::While(
@@ -291,27 +286,27 @@ impl<'a> Parser<'a> {
     }
 
     fn for_statement(&mut self) -> StatementResult {
-        self.consume(Token::is_leftparen, "Expect '(' after 'for'.".to_string())?;
+        self.consume(TokenKind::LeftParen, "Expect '(' after 'for'.".to_string())?;
 
         // Read initializer
-        let initializer = if self.match_token(Token::is_semicolon) {
+        let initializer = if self.match_token(&[TokenKind::Semicolon]) {
             None
-        } else if self.match_token(Token::is_var) {
+        } else if self.match_token(&[TokenKind::Var]) {
             Some(self.var_declaration()?)
         } else {
             Some(self.expression_statement()?)
         };
 
         // Read Condition.
-        let condition = if !self.check(Token::is_semicolon) {
+        let condition = if !self.check(&[TokenKind::Semicolon]) {
             Some(self.expression()?)
         } else {
             None
         };
-        self.consume(Token::is_semicolon, "Expect ';' after loop condition.".to_string())?;
+        self.consume(TokenKind::Semicolon, "Expect ';' after loop condition.".to_string())?;
 
         // Read increment
-        let increment = if !self.check(Token::is_rightparen) {
+        let increment = if !self.check(&[TokenKind::RightParen]) {
             Some(
                 Stmt::Expression(
                     Box::new(
@@ -324,7 +319,7 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        self.consume(Token::is_rightparen, "Expect ')' after 'for' clauses.".to_string())?;
+        self.consume(TokenKind::RightParen, "Expect ')' after 'for' clauses.".to_string())?;
 
         let for_body = self.statement()?;
 
@@ -388,13 +383,13 @@ impl<'a> Parser<'a> {
     }
 
     fn if_statement(&mut self) -> StatementResult {
-        self.consume(Token::is_leftparen, "Expect '(' after 'if'.".to_string())?;
+        self.consume(TokenKind::LeftParen, "Expect '(' after 'if'.".to_string())?;
         let condition = self.expression()?;
-        self.consume(Token::is_rightparen, "Expect ')' after 'if' condition.".to_string())?;
+        self.consume(TokenKind::RightParen, "Expect ')' after 'if' condition.".to_string())?;
 
         let then_branch = self.statement()?;
         let else_branch =
-            if self.match_token(Token::is_else) {
+            if self.match_token(&[TokenKind::Else]) {
                 self.statement()?
             } else {
                 Stmt::Empty
@@ -415,9 +410,7 @@ impl<'a> Parser<'a> {
 
 
     fn declaration(&mut self) -> StatementResult {
-        if self.match_token( |x| {
-            Token::is_var(x)
-        }) {
+        if self.match_token(&[TokenKind::Var]) {
             return self.var_declaration();
         }
         self.statement()
@@ -425,16 +418,16 @@ impl<'a> Parser<'a> {
     }
 
     fn var_declaration(&mut self) -> StatementResult {
-        let name = self.consume(Token::is_identifier,
+        let name = self.consume(TokenKind::Identifier,
                                 "Expect variable name".to_string())?;
 
-        let initializer = if self.match_token(|x| {Token::is_equal(x)}) {
+        let initializer = if self.match_token(&[TokenKind::Equal]) {
             self.expression()?
         }
         else {
             Expr::Empty
         };
-        self.consume(Token::is_semicolon, "Expect ';' after variable declaration.".to_string())?;
+        self.consume(TokenKind::Semicolon, "Expect ';' after variable declaration.".to_string())?;
         let new_id = if let Token::Identifier(x) = name
         {
             Box::new(Var {name: x, initializer})
@@ -449,19 +442,19 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> StatementResult {
-        if self.match_token(Token::is_if) {
+        if self.match_token(&[TokenKind::If]) {
             return self.if_statement();
         }
-        if self.match_token(Token::is_print) {
+        if self.match_token(&[TokenKind::Print]) {
             return self.print_statement();
         }
-        if self.match_token(Token::is_leftbrace) {
+        if self.match_token(&[TokenKind::LeftBrace]) {
             return self.block();
         }
-        if self.match_token(Token::is_while) {
+        if self.match_token(&[TokenKind::While]) {
             return self.while_statement();
         }
-        if self.match_token(Token::is_for) {
+        if self.match_token(&[TokenKind::For]) {
             return self.for_statement();
         }
         self.expression_statement()
@@ -469,10 +462,10 @@ impl<'a> Parser<'a> {
 
     fn block(&mut self) -> StatementResult {
         let mut statements: Vec<Stmt> = Vec::new();
-        while !self.check(Token::is_rightbrace) && !self.is_at_end() {
+        while !self.check(&[TokenKind::RightBrace]) && !self.is_at_end() {
             statements.push(self.declaration()?)
         }
-        self.consume(Token::is_rightbrace, "Expect '}' after block.".to_string())?;
+        self.consume(TokenKind::RightBrace, "Expect '}' after block.".to_string())?;
         Ok(
             Stmt::Block(Box::new(ast::statement::Block { statements }))
         )
@@ -480,7 +473,7 @@ impl<'a> Parser<'a> {
 
     fn print_statement(&mut self) -> StatementResult {
         let value = self.expression()?;
-        self.consume(Token::is_semicolon, "Expected ; after value".to_string())?;
+        self.consume(TokenKind::Semicolon, "Expected ; after value".to_string())?;
         let new_print = Print{expression: value};
         Ok(
             Stmt::Print(Box::new(new_print))
@@ -489,7 +482,7 @@ impl<'a> Parser<'a> {
 
     fn expression_statement(&mut self) -> StatementResult {
         let value = self.expression()?;
-        self.consume(Token::is_semicolon, "Expected ; after expression".to_string())?;
+        self.consume(TokenKind::Semicolon, "Expected ; after expression".to_string())?;
         Ok(
             Stmt::Expression(Box::new(
                 Expression{expression: value}

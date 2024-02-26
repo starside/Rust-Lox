@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.4.7", features = ["derive"] }
+enum-kinds = "0.5.1"
 lox_derive = {path = "./lox_derive"}
 lox_derive_ast = {path = "./lox_derive_ast"}

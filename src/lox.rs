@@ -1,14 +1,12 @@
 use std::str;
 use std::io;
 use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
 use std::fs::File;
 use std::io::{Read, Write};
+use enum_kinds::EnumKind;
 
 extern crate lox_derive;
 extern crate lox_derive_ast;
-use lox_derive::EnumStrings;
 use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::{Interpreter};
@@ -64,7 +62,8 @@ impl EnumElement for TokenNumberValueMetadata {
     }
 }
 
-#[derive(EnumStrings, Clone)]
+#[derive(Clone, EnumKind)]
+#[enum_kind(TokenKind)]
 pub enum Token {
     // Single-character tokens
     LeftParen(TokenMetadata),
@@ -156,13 +155,6 @@ pub mod ast {
         );
 
         type StmtList = Vec<Stmt>;
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let v: Vec<String> = self.enum_to_vector();
-        write!(f, "{}", v.join(" "))
     }
 }
 
