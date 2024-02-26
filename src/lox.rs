@@ -12,108 +12,95 @@ use crate::interpreter::{Interpreter};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 
 #[derive(Clone)]
-pub struct TokenMetadata {
-    pub line: usize
+pub struct Token {
+    pub line: usize,
+    pub token_type: TokenType
 }
 
-impl TokenMetadata {
-    pub fn new(line: usize) ->TokenMetadata {
-        TokenMetadata{line}
-    }
-}
-
-#[derive(Clone)]
-pub struct TokenTextValueMetadata {
-    pub metadata: TokenMetadata,
-    pub lexeme: String
-}
-
-#[derive(Clone)]
-pub struct TokenNumberValueMetadata {
-    pub metadata: TokenMetadata,
-    pub value: f64
-}
-
-#[derive(Clone, EnumKind)]
+#[derive(Clone, EnumKind, PartialEq)]
 #[enum_kind(TokenKind)]
-pub enum Token {
+pub enum TokenType {
     // Single-character tokens
-    LeftParen(TokenMetadata),
-    RightParen(TokenMetadata),
-    LeftBrace(TokenMetadata),
-    RightBrace(TokenMetadata),
-    Comma(TokenMetadata),
-    Dot(TokenMetadata),
-    Minus(TokenMetadata),
-    Plus(TokenMetadata),
-    Semicolon(TokenMetadata),
-    Slash(TokenMetadata),
-    Star(TokenMetadata),
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
 
     // One or two character tokens
-    Bang(TokenMetadata),
-    BangEqual(TokenMetadata),
-    Greater(TokenMetadata),
-    GreaterEqual(TokenMetadata),
-    Less(TokenMetadata),
-    LessEqual(TokenMetadata),
-    Equal(TokenMetadata),
-    EqualEqual(TokenMetadata),
+    Bang,
+    BangEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Equal,
+    EqualEqual,
 
     // Literals
-    Identifier(TokenTextValueMetadata),
-    String(TokenTextValueMetadata),
-    Number(TokenNumberValueMetadata),
+    Identifier(String),
+    String(String),
+    Number(f64),
 
     // Keywords
-    And(TokenMetadata),
-    Class(TokenMetadata),
-    Else(TokenMetadata),
-    False(TokenMetadata),
-    Fun(TokenMetadata),
-    For(TokenMetadata),
-    If(TokenMetadata),
-    Nil(TokenMetadata),
-    Or(TokenMetadata),
-    Print(TokenMetadata),
-    Return(TokenMetadata),
-    Super(TokenMetadata),
-    This(TokenMetadata),
-    True(TokenMetadata),
-    Var(TokenMetadata),
-    While(TokenMetadata),
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 
+    // End Of File
     Eof,
 }
 
 pub mod ast {
-    pub mod expression{
-        use crate::lox::{Token, TokenTextValueMetadata};
-        use lox_derive_ast::derive_ast;
+    #[derive(Clone, Debug)]
+    pub enum LiteralValue {
+        String(String),
+        Number(f64),
+        Boolean(bool),
+        Nil
+    }
 
-        #[derive(Clone, Debug)]
-        pub enum LiteralValue {
-            String(String),
-            Number(f64),
-            Boolean(bool),
-            Nil
-        }
+    type VarName = String;
+
+    pub mod expression{
+        use crate::lox::{Token};
+        use super::{LiteralValue, VarName};
+        use lox_derive_ast::derive_ast;
 
         derive_ast!(
             Ast/Expr/
-            Assign: Token name, Expr value;
+            Assign: VarName name, Expr value;
             Binary : Expr left, Token operator, Expr right;
             Grouping : Expr expression;
             Literal : LiteralValue value;
             Logical :  Expr left, Token operator, Expr right;
             Unary : Token operator, Expr right;
-            Variable: TokenTextValueMetadata name;
+            Variable: VarName name;
         );
     }
     pub mod statement{
+        use super::VarName;
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
-        use crate::lox::TokenTextValueMetadata;
         type Expr = expression::Expr;
 
         derive_ast!(
@@ -122,7 +109,7 @@ pub mod ast {
             Expression : Expr expression;
             If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
-            Var : TokenTextValueMetadata name, Expr initializer;
+            Var : VarName name, Expr initializer;
             While : Expr condition, Stmt body;
         );
 

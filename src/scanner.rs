@@ -1,4 +1,4 @@
-use crate::lox::{Token, TokenMetadata, TokenNumberValueMetadata, TokenTextValueMetadata};
+use crate::lox::{Token, TokenType};
 use std::collections::HashMap;
 
 pub struct ScannerError {
@@ -15,7 +15,7 @@ pub struct Scanner<'a> {
     line: usize,
 
     errors: Vec<ScannerError>,
-    identifier_table: HashMap<&'static str, fn(TokenMetadata) -> Token>
+    identifier_table: HashMap<&'static str, TokenType>
 }
 
 impl<'s> Scanner<'s> {
@@ -31,71 +31,25 @@ impl<'s> Scanner<'s> {
         }
     }
 
-    fn build_identifier_hash() -> HashMap<&'static str, fn(TokenMetadata) -> Token>{
-        let mut identifiers:HashMap<&str, fn(TokenMetadata) -> Token> = HashMap::new();
+    fn build_identifier_hash() -> HashMap<&'static str, TokenType>{
+        let mut identifiers:HashMap<&str, TokenType> = HashMap::new();
 
-        identifiers.insert("and", |x: TokenMetadata|
-            {
-                Token::And(x)
-            });
-        identifiers.insert("class", |x: TokenMetadata|
-            {
-                Token::Class(x)
-            });
-        identifiers.insert("else", |x: TokenMetadata|
-            {
-                Token::Else(x)
-            });
-        identifiers.insert("false", |x: TokenMetadata|
-            {
-                Token::False(x)
-            });
-        identifiers.insert("for", |x: TokenMetadata|
-            {
-                Token::For(x)
-            });
-        identifiers.insert("fun", |x: TokenMetadata|
-            {
-                Token::Fun(x)
-            });
-        identifiers.insert("if", |x: TokenMetadata|
-            {
-                Token::If(x)
-            });
-        identifiers.insert("nil", |x: TokenMetadata|
-            {
-                Token::Nil(x)
-            });
-        identifiers.insert("or", |x: TokenMetadata|
-            {
-                Token::Or(x)
-            });
-        identifiers.insert("print", |x: TokenMetadata|
-            {
-                Token::Print(x)
-            });
-        identifiers.insert("return", |x: TokenMetadata|
-            {
-                Token::Return(x)
-            });identifiers.insert("super", |x: TokenMetadata|
-            {
-                Token::Super(x)
-            });
-        identifiers.insert("this", |x: TokenMetadata|
-            {
-                Token::This(x)
-            });identifiers.insert("true", |x: TokenMetadata|
-            {
-                Token::True(x)
-            });identifiers.insert("var", |x: TokenMetadata|
-            {
-                Token::Var(x)
-            });
-            identifiers.insert("while", |x: TokenMetadata|
-            {
-                Token::While(x)
-            });
-
+        identifiers.insert("and", TokenType::And);
+        identifiers.insert("class", TokenType::Class);
+        identifiers.insert("else", TokenType::Else);
+        identifiers.insert("false", TokenType::False);
+        identifiers.insert("for", TokenType::For);
+        identifiers.insert("fun", TokenType::Fun);
+        identifiers.insert("if", TokenType::If);
+        identifiers.insert("nil", TokenType::Nil);
+        identifiers.insert("or", TokenType::Or);
+        identifiers.insert("print", TokenType::Print);
+        identifiers.insert("return", TokenType::Return);
+        identifiers.insert("super", TokenType::Super);
+        identifiers.insert("this", TokenType::This);
+        identifiers.insert("true", TokenType::True);
+        identifiers.insert("var", TokenType::Var);
+        identifiers.insert("while", TokenType::While);
         identifiers
     }
 
@@ -104,7 +58,9 @@ impl<'s> Scanner<'s> {
             self.start = self.current;
             self.scan_token();
         }
-        self.add_token(Token::Eof);
+        self.add_token(self.new_token(
+            TokenType::Eof
+        ));
 
         if self.errors.is_empty() {
             Ok(&self.tokens)
@@ -119,24 +75,27 @@ impl<'s> Scanner<'s> {
     }
 
     // Abbreviated for New Token Meta Data
-    fn ntmd(&self) -> TokenMetadata {
-        TokenMetadata::new(self.line)
+    fn new_token(&self, token_type: TokenType) -> Token {
+        Token {
+            line: self.line,
+            token_type
+        }
     }
 
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
             // Single character tokens
-            '(' => self.add_token(Token::LeftParen(self.ntmd())),
-            ')' => self.add_token(Token::RightParen(self.ntmd())),
-            '{' => self.add_token(Token::LeftBrace(self.ntmd())),
-            '}' => self.add_token(Token::RightBrace(self.ntmd())),
-            ',' => self.add_token(Token::Comma(self.ntmd())),
-            '.' => self.add_token(Token::Dot(self.ntmd())),
-            '-' => self.add_token(Token::Minus(self.ntmd())),
-            '+' => self.add_token(Token::Plus(self.ntmd())),
-            ';' => self.add_token(Token::Semicolon(self.ntmd())),
-            '*' => self.add_token(Token::Star(self.ntmd())),
+            '(' => self.add_token(self.new_token(TokenType::LeftParen)),
+            ')' => self.add_token(self.new_token(TokenType::RightParen)),
+            '{' => self.add_token(self.new_token(TokenType::LeftBrace)),
+            '}' => self.add_token(self.new_token(TokenType::RightBrace)),
+            ',' => self.add_token(self.new_token(TokenType::Comma)),
+            '.' => self.add_token(self.new_token(TokenType::Dot)),
+            '-' => self.add_token(self.new_token(TokenType::Minus)),
+            '+' => self.add_token(self.new_token(TokenType::Plus)),
+            ';' => self.add_token(self.new_token(TokenType::Semicolon)),
+            '*' => self.add_token(self.new_token(TokenType::Star)),
 
             // Whitespace
             ' ' | '\r' | '\t' => {},
@@ -145,19 +104,19 @@ impl<'s> Scanner<'s> {
             // Two character tokens
             '!' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {Token::BangEqual(self.ntmd())} else {Token::Bang(self.ntmd())})
+                self.add_token(if matched {self.new_token(TokenType::BangEqual)} else {self.new_token(TokenType::Bang)})
             },
             '=' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {Token::EqualEqual(self.ntmd())} else {Token::Equal(self.ntmd())})
+                self.add_token(if matched {self.new_token(TokenType::EqualEqual)} else {self.new_token(TokenType::Equal)})
             },
             '<' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {Token::LessEqual(self.ntmd())} else {Token::Less(self.ntmd())})
+                self.add_token(if matched {self.new_token(TokenType::LessEqual)} else {self.new_token(TokenType::Less)})
             },
             '>' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {Token::GreaterEqual(self.ntmd())} else {Token::Greater(self.ntmd())})
+                self.add_token(if matched {self.new_token(TokenType::GreaterEqual)} else {self.new_token(TokenType::Greater)})
             },
             '/' => {
                 let matched = self.match_char('/');
@@ -167,7 +126,7 @@ impl<'s> Scanner<'s> {
                     }
                 }
                 else {
-                    self.add_token(Token::Slash(self.ntmd()))
+                    self.add_token(self.new_token(TokenType::Slash))
                 }
             },
 
@@ -194,13 +153,12 @@ impl<'s> Scanner<'s> {
         let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
 
         if let Some(keyword) = self.identifier_table.get(value) {
-            self.add_token(keyword(self.ntmd()));
+            self.add_token(self.new_token(keyword.clone()));
         }
         else {
-            self.add_token(Token::Identifier(TokenTextValueMetadata{
-                metadata: self.ntmd(),
-                lexeme: value.to_string()
-            }));
+            self.add_token(self.new_token(
+                TokenType::Identifier(value.to_string())
+            ));
         }
     }
 
@@ -216,10 +174,9 @@ impl<'s> Scanner<'s> {
             }
         }
         let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
-        self.add_token(Token::Number(TokenNumberValueMetadata{
-            metadata: self.ntmd(),
-            value: value.parse::<f64>().unwrap()
-        }));
+        self.add_token(self.new_token(
+            TokenType::Number(value.parse::<f64>().unwrap())
+        ));
     }
 
     fn string(&mut self) {
@@ -238,7 +195,9 @@ impl<'s> Scanner<'s> {
         // The closing "
         self.advance();
         let value = std::str::from_utf8(&self.source.as_bytes()[(self.start+1)..(self.current-1)]).unwrap();
-        self.add_token(Token::String(TokenTextValueMetadata {metadata: self.ntmd(), lexeme: value.to_string()}))
+        self.add_token(self.new_token(
+            TokenType::String(value.to_string())
+        ));
     }
 
     fn peek(&self) -> char {

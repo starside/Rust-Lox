@@ -1,5 +1,6 @@
-use crate::lox::{ast, Token, TokenKind};
-use crate::lox::ast::expression::{Binary, Expr, LiteralValue, Unary};
+use crate::lox::ast::LiteralValue;
+use crate::lox::{ast, Token, TokenKind, TokenType};
+use crate::lox::ast::expression::{Binary, Expr, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
 pub struct Parser<'a> {
@@ -22,7 +23,8 @@ impl<'a> Parser<'a> {
     }
 
     fn is_at_end(&self) -> bool {
-        if let Token::Eof = self.peek() {
+        let token = self.peek();
+        if TokenType::Eof == token.token_type {
             return true;
         }
         false
@@ -45,7 +47,7 @@ impl<'a> Parser<'a> {
             return false;
         }
 
-        match_types.contains(&TokenKind::from(self.peek()))
+        match_types.contains(&TokenKind::from(&self.peek().token_type))
     }
 
     fn consume(&mut self, match_type: TokenKind, error_message: String) ->  Result<Token, ParserError>
@@ -106,7 +108,7 @@ impl<'a> Parser<'a> {
             let r = match &expr {
                 Expr::Variable(x) => {
                     Ok(Expr::Assign(
-                        Box::new(ast::expression::Assign{name: Token::Identifier(x.name.clone()), value })
+                        Box::new(ast::expression::Assign{name: x.name.clone(), value})
                     ))
                 }
                 _ => {
@@ -237,10 +239,10 @@ impl<'a> Parser<'a> {
 
         if self.match_token(
             &[TokenKind::Number, TokenKind::String]) {
-            let previous = self.previous();
+            let previous = &self.previous().token_type;
             let value = match previous {
-                Token::String(x) => LiteralValue::String(x.lexeme.clone()),
-                Token::Number(x) => LiteralValue::Number(x.value),
+                TokenType::String(x) => LiteralValue::String(x.clone()),
+                TokenType::Number(x) => LiteralValue::Number(*x),
                 _ => panic!("Error")
             };
             return Ok(Expr::Literal(Box::new(ast::expression::Literal{value})));
@@ -248,11 +250,10 @@ impl<'a> Parser<'a> {
 
         if self.match_token(
             &[TokenKind::Identifier]) {
-            let previous = self.previous();
-            if let Token::Identifier(x) = previous {
+            let previous = &self.previous().token_type;
+            if let TokenType::Identifier(x) = previous {
                 return Ok(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()})));
             };
-
         }
 
         if self.match_token(&[TokenKind::LeftParen]) {
@@ -428,7 +429,7 @@ impl<'a> Parser<'a> {
             Expr::Empty
         };
         self.consume(TokenKind::Semicolon, "Expect ';' after variable declaration.".to_string())?;
-        let new_id = if let Token::Identifier(x) = name
+        let new_id = if let TokenType::Identifier(x) = name.token_type
         {
             Box::new(Var {name: x, initializer})
         } else {

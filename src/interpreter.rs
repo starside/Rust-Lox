@@ -1,5 +1,6 @@
-use crate::lox::{ast, Token};
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, LiteralValue, Logical, Unary, Variable};
+use crate::lox::{ast, TokenType};
+use crate::lox::ast::LiteralValue;
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
 
@@ -143,7 +144,7 @@ impl StmtVisitor<Result<(), String>> for Interpreter
                 stmt.initializer.accept(self)?
             }
         };
-        self.environment.define(&stmt.name.lexeme, &value);
+        self.environment.define(&stmt.name, &value);
         Ok(())
     }
 
@@ -158,12 +159,8 @@ impl StmtVisitor<Result<(), String>> for Interpreter
 impl AstVisitor<RunValue> for Interpreter {
     fn visit_assign(&mut self, expr: &Assign) -> RunValue {
         let value = expr.value.accept(self)?;
-        if let Token::Identifier(m) = &expr.name {
-            self.environment.assign(&m.lexeme, &value)?;
-            return Ok(value);
-        }
-
-        panic!("Logic error") // Can I change the data structures to avoid this logic error?
+        self.environment.assign(&expr.name, &value)?;
+        return Ok(value);
     }
 
     fn visit_binary(&mut self, visitor: &Binary) -> RunValue {
@@ -173,18 +170,18 @@ impl AstVisitor<RunValue> for Interpreter {
         match (&left, &right) {
             // If both operands are strings
             (LiteralValue::String(l), LiteralValue::String(r)) => {
-                match visitor.operator {
-                    Token::Plus(_) => {
+                match visitor.operator.token_type {
+                    TokenType::Plus => {
                         let mut new_str = l.to_string();
                         new_str.push_str(r);
                         Ok(LiteralValue::String(new_str))
                     }
 
-                    Token::BangEqual(_) => {
+                    TokenType::BangEqual => {
                         Ok(LiteralValue::Boolean(!is_equal(&left, &right)))
                     }
 
-                    Token::EqualEqual(_) => {
+                    TokenType::EqualEqual => {
                         Ok(LiteralValue::Boolean(is_equal(&left, &right)))
                     }
                     _ => {
@@ -196,17 +193,17 @@ impl AstVisitor<RunValue> for Interpreter {
 
             // If Both operands are numbers
             (LiteralValue::Number(l), LiteralValue::Number(r)) => {
-                match visitor.operator {
-                    Token::Plus(_) => {Ok(LiteralValue::Number(l+r))}
-                    Token::Minus(_) => {Ok(LiteralValue::Number(l-r))}
-                    Token::Star(_) => {Ok(LiteralValue::Number(l*r))}
-                    Token::Slash(_) => {Ok(LiteralValue::Number(l/r))}
-                    Token::BangEqual(_) => {Ok(LiteralValue::Boolean(l != r))}
-                    Token::EqualEqual(_) => {Ok(LiteralValue::Boolean(l == r))}
-                    Token::Greater(_) => {Ok(LiteralValue::Boolean(l > r))}
-                    Token::GreaterEqual(_) => {Ok(LiteralValue::Boolean(l >= r))}
-                    Token::Less(_) => {Ok(LiteralValue::Boolean(l < r))}
-                    Token::LessEqual(_) => {Ok(LiteralValue::Boolean(l <= r))}
+                match visitor.operator.token_type {
+                    TokenType::Plus => {Ok(LiteralValue::Number(l+r))}
+                    TokenType::Minus => {Ok(LiteralValue::Number(l-r))}
+                    TokenType::Star => {Ok(LiteralValue::Number(l*r))}
+                    TokenType::Slash => {Ok(LiteralValue::Number(l/r))}
+                    TokenType::BangEqual => {Ok(LiteralValue::Boolean(l != r))}
+                    TokenType::EqualEqual => {Ok(LiteralValue::Boolean(l == r))}
+                    TokenType::Greater => {Ok(LiteralValue::Boolean(l > r))}
+                    TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r))}
+                    TokenType::Less => {Ok(LiteralValue::Boolean(l < r))}
+                    TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r))}
                     _ => Err("Unknown operand between two Numbers".to_string())
                 }
             }
@@ -228,13 +225,13 @@ impl AstVisitor<RunValue> for Interpreter {
     fn visit_logical(&mut self, logical: &Logical) -> RunValue {
         let left = logical.left.accept(self)?;
 
-        match logical.operator {
-            Token::And(_) => {
+        match logical.operator.token_type {
+            TokenType::And => {
                 if !is_truthy(&left) {
                     return Ok(left);
                 }
             }
-            Token::Or(_) => {
+            TokenType::Or => {
                 if is_truthy(&left) {
                     return Ok(left);
                 }
@@ -250,8 +247,8 @@ impl AstVisitor<RunValue> for Interpreter {
     fn visit_unary(&mut self, visitor: &Unary) -> RunValue {
         let right = visitor.right.accept(self)?;
 
-        let value = match visitor.operator {
-            Token::Minus(_) => {
+        let value = match visitor.operator.token_type {
+            TokenType::Minus => {
                 if let LiteralValue::Number(x) = right {
                     Ok(LiteralValue::Number(-x))
                 }
@@ -260,7 +257,7 @@ impl AstVisitor<RunValue> for Interpreter {
                 }
             }
 
-            Token::Bang(_) => {
+            TokenType::Bang => {
                 Ok(LiteralValue::Boolean(!is_truthy(&right)))
             }
             _ => Err("Unknown unary operator".to_string())
@@ -270,7 +267,7 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
-        let res = self.environment.get(&varname.name.lexeme);
+        let res = self.environment.get(&varname.name);
         res
     }
 }
