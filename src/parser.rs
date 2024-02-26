@@ -74,12 +74,22 @@ impl<'a> Parser<'a> {
         false
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParserError> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<ParserError>> {
         let mut statements: Vec<Stmt> = Vec::new();
+        let mut errors: Vec<ParserError> = Vec::new();
+
         while !self.is_at_end() {
-            statements.push(self.declaration()?)
+            let result = self.declaration();
+            match result {
+                Ok(x) => {statements.push(x)}
+                Err(x) => {errors.push(x)}
+            };
         }
-        Ok(statements)
+        if errors.is_empty() {
+            Ok(statements)
+        } else {
+            Err(errors)
+        }
     }
 
     fn comparison(&mut self) -> ParserResult
@@ -409,13 +419,40 @@ impl<'a> Parser<'a> {
         )
     }
 
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().token_type {
+                TokenType::Class | TokenType::Fun | TokenType::For |TokenType::If |
+                TokenType::Print | TokenType::Return | TokenType::Var | TokenType::While
+                    => {
+                    return;
+                }
+                _ => {}
+            }
+
+            self.advance();
+        }
+    }
+
 
     fn declaration(&mut self) -> StatementResult {
-        if self.match_token(&[TokenKind::Var]) {
-            return self.var_declaration();
+        let result = if self.match_token(&[TokenKind::Var]) {
+            self.var_declaration()
+        } else{
+            self.statement()
+        };
+
+        if result.is_err() {
+            self.synchronize();
         }
-        self.statement()
-        // If there was an error synchronize
+
+        result
     }
 
     fn var_declaration(&mut self) -> StatementResult {

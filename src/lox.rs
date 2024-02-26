@@ -11,13 +11,13 @@ use crate::{scanner};
 use crate::interpreter::{Interpreter};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub line: usize,
     pub token_type: TokenType
 }
 
-#[derive(Clone, EnumKind, PartialEq)]
+#[derive(Clone, EnumKind, PartialEq, Debug)]
 #[enum_kind(TokenKind)]
 pub enum TokenType {
     // Single-character tokens
@@ -132,9 +132,11 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                         }
                     }
                 }
-                Err(err) => {
-                    let (t, b) = err;
-                    println!("Parse Error on line {}: {}", t.line, b);
+                Err(errs) => {
+                    for err in errs {
+                        let (t, b) = err;
+                        println!("Parse Error on line {}: {}", t.line, b);
+                    }
                 }
             }
         }
