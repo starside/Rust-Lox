@@ -90,12 +90,14 @@ pub mod ast {
             Ast/Expr/
             Assign: VarName name, Expr value;
             Binary : Expr left, Token operator, Expr right;
+            Call: Expr callee, Token paren, ExprList arguments;
             Grouping : Expr expression;
             Literal : LiteralValue value;
             Logical :  Expr left, Token operator, Expr right;
             Unary : Token operator, Expr right;
             Variable: VarName name;
         );
+        type ExprList = Vec<Expr>;
     }
     pub mod statement{
         use super::VarName;

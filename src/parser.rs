@@ -1,6 +1,6 @@
 use crate::lox::ast::LiteralValue;
 use crate::lox::{ast, Token, TokenKind, TokenType};
-use crate::lox::ast::expression::{Binary, Expr, Unary};
+use crate::lox::ast::expression::{Binary, Call, Expr, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
 pub struct Parser<'a> {
@@ -219,6 +219,45 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    fn finish_call(&mut self, callee: Expr) -> ParserResult {
+        let mut arguments: Vec<Expr> = Vec::new();
+        if !self.check(&[TokenKind::RightParen]) {
+            loop {
+                if arguments.len() >= 255 {
+                    return Err(self.error(self.peek(), "Cant have more than 255 arguments.".to_string()));
+                }
+                arguments.push(self.expression()?);
+                if !self.match_token(&[TokenKind::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(TokenKind::RightParen, "Expect ')' after arguments.".to_string())?;
+        Ok(
+            Expr::Call(
+                Box::new(Call{
+                    callee,
+                    paren,
+                    arguments
+                })
+            )
+        )
+    }
+    fn call(&mut self) -> ParserResult {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(&[TokenKind::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
     fn unary(&mut self) -> ParserResult
     {
         if self.match_token(
@@ -231,7 +270,7 @@ impl<'a> Parser<'a> {
             );
         }
 
-        self.primary()
+        self.call()
     }
 
     fn primary(&mut self) -> ParserResult {

@@ -1,6 +1,6 @@
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Grouping, Literal, Logical, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
 
@@ -212,6 +212,19 @@ impl AstVisitor<RunValue> for Interpreter {
                 Err("Operands must be two numbers or two strings".to_string())
             }
         }
+    }
+
+    fn visit_call(&mut self, expr: &Call) -> RunValue {
+        let callee = expr.callee.accept(self)?;
+
+        let mut arguments: Vec<LiteralValue> = Vec::new();
+        for argument in expr.arguments.iter() {
+            arguments.push(argument.accept(self)?);
+        }
+
+        //LoxCallable function = (LoxCallable)callee;
+        //return function.call(this, arguments);
+        todo!()
     }
 
     fn visit_grouping(&mut self, visitor: &Grouping) -> RunValue {
