@@ -11,14 +11,6 @@ use crate::{scanner};
 use crate::interpreter::{Interpreter};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 
-pub trait EnumVectorize {
-    fn enum_to_vector(&self) -> Vec<String>;
-}
-
-trait EnumElement {
-    fn enum_to_element(&self) -> String;
-}
-
 #[derive(Clone)]
 pub struct TokenMetadata {
     pub line: usize
@@ -40,25 +32,6 @@ pub struct TokenTextValueMetadata {
 pub struct TokenNumberValueMetadata {
     pub metadata: TokenMetadata,
     pub value: f64
-}
-
-impl EnumElement for TokenMetadata {
-    fn enum_to_element(&self) -> String {
-        self.line.to_string()
-    }
-}
-
-impl EnumElement for TokenTextValueMetadata {
-    fn enum_to_element(&self) -> String {
-        self.lexeme.to_string()
-    }
-
-}
-
-impl EnumElement for TokenNumberValueMetadata {
-    fn enum_to_element(&self) -> String {
-        self.value.to_string()
-    }
 }
 
 #[derive(Clone, EnumKind)]
