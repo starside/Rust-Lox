@@ -133,8 +133,8 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                     }
                 }
                 Err(err) => {
-                    let (_, b) = err;
-                    println!("Parse Error: {}", b);
+                    let (t, b) = err;
+                    println!("Parse Error on line {}: {}", t.line, b);
                 }
             }
         }
