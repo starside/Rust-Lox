@@ -3,17 +3,21 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
+use std::fmt::format;
 use std::rc::Rc;
 
 
 trait Callable {
-    fn call(&mut self, interpreter: Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
+    fn arity(&self) -> usize;
 }
+
+type LValueType = Rc<Box<dyn Callable>>;
 
 #[derive(Clone)]
 enum EvalValue {
     RValue(LiteralValue),
-    LValue(Rc<Box<dyn Callable>>)
+    LValue(LValueType)
 }
 
 impl EvalValue {
@@ -24,8 +28,11 @@ impl EvalValue {
         }
     }
 
-    pub fn get_callable(&self) -> Result<LiteralValue, String> {
-        todo!()
+    pub fn get_callable(&self) -> Result<LValueType, String> {
+        match self {
+            EvalValue::RValue(_) => {Err("Cannot convert to literal".to_string())}
+            EvalValue::LValue(l) => {Ok(l.clone())}
+        }
     }
 }
 
@@ -41,6 +48,18 @@ type RunValue = Result<EvalValue, String>;
 struct Environment {
     values: Vec<HashMap<String, EvalValue>>
 }
+
+struct BuiltinFunctionTime;
+
+impl Callable for BuiltinFunctionTime {
+    fn call(&self, _interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> EvalValue {
+        EvalValue::RValue(LiteralValue::Number(1.1))
+    }
+    fn arity(&self) -> usize {
+        0
+    }
+}
+
 
 impl Environment {
 
@@ -62,8 +81,8 @@ impl Environment {
         self.values.last_mut().unwrap()
     }
 
-    pub fn define(&mut self, name: &String, value: &EvalValue) {
-        self.current_frame().insert(name.clone(), value.clone());
+    pub fn define(&mut self, name: &str, value: &EvalValue) {
+        self.current_frame().insert(String::from(name), value.clone());
     }
 
     pub fn assign(&mut self, name: &String, value: &EvalValue) -> Result<(),String> {
@@ -99,7 +118,11 @@ pub struct Interpreter {
 
 impl<'a> Interpreter {
     pub fn new() -> Self {
-        Interpreter{environment: Environment::new()}
+        let mut environment = Environment::new();
+        environment.define("time", &EvalValue::LValue(
+            Rc::new(Box::new(BuiltinFunctionTime))
+        ));
+        Interpreter{environment}
     }
 }
 
@@ -251,15 +274,20 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_call(&mut self, expr: &Call) -> RunValue {
         let callee = expr.callee.accept(self)?;
+        let callee = callee.get_callable()?;
+
+        if expr.arguments.len() != callee.arity(){
+            let err = format!("Line {}, expected {} but got {} arguments",
+                              expr.paren.line, callee.arity(), expr.arguments.len());
+            return Err(err);
+        }
 
         let mut arguments: Vec<EvalValue> = Vec::new();
         for argument in expr.arguments.iter() {
             arguments.push(argument.accept(self)?);
         }
 
-        //LoxCallable function = (LoxCallable)callee;
-        //return function.call(this, arguments);
-        todo!()
+        Ok(callee.call(self, arguments))
     }
 
     fn visit_grouping(&mut self, visitor: &Grouping) -> RunValue {

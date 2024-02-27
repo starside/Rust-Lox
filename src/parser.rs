@@ -269,7 +269,6 @@ impl<'a> Parser<'a> {
                 )
             );
         }
-
         self.call()
     }
 
