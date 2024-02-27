@@ -100,15 +100,18 @@ pub mod ast {
         type ExprList = Vec<Expr>;
     }
     pub mod statement{
-        use super::VarName;
+        use crate::lox::ast::VarName;
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
+        use crate::lox::Token;
+
         type Expr = expression::Expr;
 
         derive_ast!(
             Stmt/Stmt/
             Block: StmtList statements;
             Expression : Expr expression;
+            Function: Token name, TokenList params, Stmt body;
             If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
             Var : VarName name, Expr initializer;
@@ -116,6 +119,7 @@ pub mod ast {
         );
 
         type StmtList = Vec<Stmt>;
+        type TokenList = Vec<Token>;
     }
 }
 

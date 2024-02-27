@@ -478,11 +478,50 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn fun_declaration(&mut self) -> StatementResult {
+        let name = self.consume(TokenKind::Identifier,
+                                "Expect function name".to_string())?;
+        self.consume(TokenKind::LeftParen,
+                                "Expect '(' after function name".to_string())?;
+        let mut params: Vec<Token> = Vec::new();
+        if !self.check(&[TokenKind::RightParen]) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(self.error(self.peek(), "Functions have 255 parameters max".to_string()));
+                }
+                params.push(self.consume(TokenKind::Identifier, "Expect an identifier".to_string())?);
+                if !self.match_token(&[TokenKind::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenKind::RightParen,
+                                 "Expect ')' after parameter list".to_string())?;
+
+
+        self.consume(TokenKind::LeftBrace, "Expect '{' before function body.".to_string())?;
+        let body = self.block()?;
+        Ok(
+            Stmt::Function(
+                Box::new(
+                    ast::statement::Function {
+                        name,
+                        params,
+                        body
+                    }
+                )
+            )
+        )
+    }
 
     fn declaration(&mut self) -> StatementResult {
         let result = if self.match_token(&[TokenKind::Var]) {
             self.var_declaration()
-        } else{
+        } else if self.match_token(&[TokenKind::Fun]) {
+            self.fun_declaration()
+        }
+        else{
             self.statement()
         };
 

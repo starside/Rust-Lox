@@ -1,7 +1,7 @@
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Instant, SystemTime};
@@ -162,6 +162,10 @@ impl StmtVisitor<Result<(), String>> for Interpreter
     fn visit_expression(&mut self, expression: &Expression) -> Result<(), String> {
         expression.expression.accept(self)?;
         Ok(())
+    }
+
+    fn visit_function(&mut self, visitor: &Function) -> Result<(), String> {
+        todo!()
     }
 
     fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
