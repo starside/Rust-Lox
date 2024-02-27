@@ -3,8 +3,8 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
-use std::fmt::format;
 use std::rc::Rc;
+use std::time::{Instant, SystemTime};
 
 
 trait Callable {
@@ -30,7 +30,7 @@ impl EvalValue {
 
     pub fn get_callable(&self) -> Result<LValueType, String> {
         match self {
-            EvalValue::RValue(_) => {Err("Cannot convert to literal".to_string())}
+            EvalValue::RValue(_) => {Err("Cannot convert to callable".to_string())}
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
     }
@@ -52,8 +52,10 @@ struct Environment {
 struct BuiltinFunctionTime;
 
 impl Callable for BuiltinFunctionTime {
-    fn call(&self, _interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> EvalValue {
-        EvalValue::RValue(LiteralValue::Number(1.1))
+    fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> EvalValue {
+        EvalValue::RValue(LiteralValue::Number(
+            Instant::now().duration_since(interpreter.boot_time).as_micros() as f64
+        ))
     }
     fn arity(&self) -> usize {
         0
@@ -113,7 +115,8 @@ impl Environment {
 }
 
 pub struct Interpreter {
-    environment: Environment
+    environment: Environment,
+    boot_time: Instant
 }
 
 impl<'a> Interpreter {
@@ -122,7 +125,7 @@ impl<'a> Interpreter {
         environment.define("time", &EvalValue::LValue(
             Rc::new(Box::new(BuiltinFunctionTime))
         ));
-        Interpreter{environment}
+        Interpreter{environment, boot_time: Instant::now()}
     }
 }
 
