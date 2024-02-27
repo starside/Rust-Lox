@@ -3,12 +3,43 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, If, Print, StmtVisitor, Var, While};
 use std::collections::HashMap;
+use std::rc::Rc;
 
-type RunValue = Result<LiteralValue, String>;
+
+trait Callable {
+    fn call(&mut self, interpreter: Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
+}
+
+#[derive(Clone)]
+enum EvalValue {
+    RValue(LiteralValue),
+    LValue(Rc<Box<dyn Callable>>)
+}
+
+impl EvalValue {
+    pub fn get_literal(&self) -> Result<&LiteralValue, String> {
+        match self {
+            EvalValue::RValue(x) => {Ok(x)}
+            EvalValue::LValue(_) => {Err("Cannot convert to callable".to_string())}
+        }
+    }
+
+    pub fn get_callable(&self) -> Result<LiteralValue, String> {
+        todo!()
+    }
+}
+
+impl From<LiteralValue> for EvalValue{
+    fn from(value: LiteralValue) -> Self {
+        EvalValue::RValue(value)
+    }
+}
+
+type RunValue = Result<EvalValue, String>;
 
 // Environment to store variables at some level of scope
 struct Environment {
-    values: Vec<HashMap<String, LiteralValue>>
+    values: Vec<HashMap<String, EvalValue>>
 }
 
 impl Environment {
@@ -27,15 +58,15 @@ impl Environment {
         self.values.pop();
     }
 
-    fn current_frame(&mut self) -> &mut HashMap<String, LiteralValue> {
+    fn current_frame(&mut self) -> &mut HashMap<String, EvalValue> {
         self.values.last_mut().unwrap()
     }
 
-    pub fn define(&mut self, name: &String, value: &LiteralValue) {
+    pub fn define(&mut self, name: &String, value: &EvalValue) {
         self.current_frame().insert(name.clone(), value.clone());
     }
 
-    pub fn assign(&mut self, name: &String, value: &LiteralValue) -> Result<(),String> {
+    pub fn assign(&mut self, name: &String, value: &EvalValue) -> Result<(),String> {
         let name = name.clone();
 
         if let Some(scope) =
@@ -108,7 +139,7 @@ impl StmtVisitor<Result<(), String>> for Interpreter
     }
 
     fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
-        if is_truthy(&ifstmt.condition.accept(self)?) {
+        if is_truthy(ifstmt.condition.accept(self)?.get_literal()?) {
             ifstmt.then_branch.accept(self)?;
         } else {
             ifstmt.else_branch.accept(self)?;
@@ -118,6 +149,8 @@ impl StmtVisitor<Result<(), String>> for Interpreter
 
     fn visit_print(&mut self, print: &Print) -> Result<(), String> {
         let value = print.expression.accept(self)?;
+        let value = value.get_literal()?;
+
         match value {
             LiteralValue::String(x) => {
                 println!("{}", x);
@@ -141,15 +174,15 @@ impl StmtVisitor<Result<(), String>> for Interpreter
                 LiteralValue::Nil
             }
             _ => {
-                stmt.initializer.accept(self)?
+                stmt.initializer.accept(self)?.get_literal()?.clone()
             }
         };
-        self.environment.define(&stmt.name, &value);
+        self.environment.define(&stmt.name, &EvalValue::RValue(value));
         Ok(())
     }
 
     fn visit_while(&mut self, whilestmt: &While) -> Result<(), String> {
-        while is_truthy(&whilestmt.condition.accept(self)?) {
+        while is_truthy(whilestmt.condition.accept(self)?.get_literal()?) {
             whilestmt.body.accept(self)?;
         }
         Ok(())
@@ -165,7 +198,9 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_binary(&mut self, visitor: &Binary) -> RunValue {
         let left = visitor.left.accept(self)?;
+        let left = left.get_literal()?;
         let right = visitor.right.accept(self)?;
+        let right = right.get_literal()?;
 
         match (&left, &right) {
             // If both operands are strings
@@ -174,15 +209,15 @@ impl AstVisitor<RunValue> for Interpreter {
                     TokenType::Plus => {
                         let mut new_str = l.to_string();
                         new_str.push_str(r);
-                        Ok(LiteralValue::String(new_str))
+                        Ok(LiteralValue::String(new_str).into())
                     }
 
                     TokenType::BangEqual => {
-                        Ok(LiteralValue::Boolean(!is_equal(&left, &right)))
+                        Ok(LiteralValue::Boolean(!is_equal(&left, &right)).into())
                     }
 
                     TokenType::EqualEqual => {
-                        Ok(LiteralValue::Boolean(is_equal(&left, &right)))
+                        Ok(LiteralValue::Boolean(is_equal(&left, &right)).into())
                     }
                     _ => {
                         Err("Invalid binary operation between strings".to_string())
@@ -194,16 +229,16 @@ impl AstVisitor<RunValue> for Interpreter {
             // If Both operands are numbers
             (LiteralValue::Number(l), LiteralValue::Number(r)) => {
                 match visitor.operator.token_type {
-                    TokenType::Plus => {Ok(LiteralValue::Number(l+r))}
-                    TokenType::Minus => {Ok(LiteralValue::Number(l-r))}
-                    TokenType::Star => {Ok(LiteralValue::Number(l*r))}
-                    TokenType::Slash => {Ok(LiteralValue::Number(l/r))}
-                    TokenType::BangEqual => {Ok(LiteralValue::Boolean(l != r))}
-                    TokenType::EqualEqual => {Ok(LiteralValue::Boolean(l == r))}
-                    TokenType::Greater => {Ok(LiteralValue::Boolean(l > r))}
-                    TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r))}
-                    TokenType::Less => {Ok(LiteralValue::Boolean(l < r))}
-                    TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r))}
+                    TokenType::Plus => {Ok(LiteralValue::Number(l+r).into())}
+                    TokenType::Minus => {Ok(LiteralValue::Number(l-r).into())}
+                    TokenType::Star => {Ok(LiteralValue::Number(l*r).into())}
+                    TokenType::Slash => {Ok(LiteralValue::Number(l/r).into())}
+                    TokenType::BangEqual => {Ok(LiteralValue::Boolean(l != r).into())}
+                    TokenType::EqualEqual => {Ok(LiteralValue::Boolean(l == r).into())}
+                    TokenType::Greater => {Ok(LiteralValue::Boolean(l > r).into())}
+                    TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r).into())}
+                    TokenType::Less => {Ok(LiteralValue::Boolean(l < r).into())}
+                    TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r).into())}
                     _ => Err("Unknown operand between two Numbers".to_string())
                 }
             }
@@ -217,7 +252,7 @@ impl AstVisitor<RunValue> for Interpreter {
     fn visit_call(&mut self, expr: &Call) -> RunValue {
         let callee = expr.callee.accept(self)?;
 
-        let mut arguments: Vec<LiteralValue> = Vec::new();
+        let mut arguments: Vec<EvalValue> = Vec::new();
         for argument in expr.arguments.iter() {
             arguments.push(argument.accept(self)?);
         }
@@ -232,21 +267,22 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_literal(&mut self, visitor: &Literal) -> RunValue {
-        Ok(visitor.value.clone())
+        Ok(visitor.value.clone().into())
     }
 
     fn visit_logical(&mut self, logical: &Logical) -> RunValue {
         let left = logical.left.accept(self)?;
+        let left = left.get_literal()?;
 
         match logical.operator.token_type {
             TokenType::And => {
                 if !is_truthy(&left) {
-                    return Ok(left);
+                    return Ok(left.clone().into());
                 }
             }
             TokenType::Or => {
                 if is_truthy(&left) {
-                    return Ok(left);
+                    return Ok(left.clone().into());
                 }
             }
             _ => {
@@ -262,8 +298,8 @@ impl AstVisitor<RunValue> for Interpreter {
 
         let value = match visitor.operator.token_type {
             TokenType::Minus => {
-                if let LiteralValue::Number(x) = right {
-                    Ok(LiteralValue::Number(-x))
+                if let LiteralValue::Number(x) = right.get_literal()? {
+                    Ok(LiteralValue::Number(-x).into())
                 }
                 else {
                     Err("Unary minus must operate on a number".to_string())
@@ -271,7 +307,7 @@ impl AstVisitor<RunValue> for Interpreter {
             }
 
             TokenType::Bang => {
-                Ok(LiteralValue::Boolean(!is_truthy(&right)))
+                Ok(LiteralValue::Boolean(!is_truthy(right.get_literal()?)).into())
             }
             _ => Err("Unknown unary operator".to_string())
         };
