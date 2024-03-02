@@ -100,6 +100,7 @@ pub mod ast {
         type ExprList = Vec<Expr>;
     }
     pub mod statement{
+        use std::rc::Rc;
         use crate::lox::ast::VarName;
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
@@ -111,7 +112,7 @@ pub mod ast {
             Stmt/Stmt/
             Block: StmtList statements;
             Expression : Expr expression;
-            Function: Token name, TokenList params, Stmt body;
+            Function: Token name, TokenList params, FuncBody body;
             If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
             Var : VarName name, Expr initializer;
@@ -120,6 +121,7 @@ pub mod ast {
 
         type StmtList = Vec<Stmt>;
         type TokenList = Vec<Token>;
+        pub type FuncBody = Rc<Box<Stmt>>; // Can I eliminate this with lifetimes?
     }
 }
 

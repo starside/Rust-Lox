@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::lox::ast::LiteralValue;
 use crate::lox::{ast, Token, TokenKind, TokenType};
 use crate::lox::ast::expression::{Binary, Call, Expr, Unary};
@@ -508,7 +509,7 @@ impl<'a> Parser<'a> {
                     ast::statement::Function {
                         name,
                         params,
-                        body
+                        body: Rc::new(Box::new(body)) // Damn, I need to figure out lifetimes
                     }
                 )
             )

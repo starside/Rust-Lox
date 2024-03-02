@@ -1,15 +1,18 @@
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, StmtVisitor, Var, While};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::str::from_utf8_unchecked;
 use std::time::{Instant};
+use crate::lox;
 
 
 trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
     fn arity(&self) -> usize;
+    fn to_literal(&self) -> LiteralValue;
 }
 
 type LValueType = Rc<Box<dyn Callable>>;
@@ -21,10 +24,10 @@ enum EvalValue {
 }
 
 impl EvalValue {
-    pub fn get_literal(&self) -> Result<&LiteralValue, String> {
+    pub fn get_literal(&self) -> Result<LiteralValue, String> {
         match self {
-            EvalValue::RValue(x) => {Ok(x)}
-            EvalValue::LValue(_) => {Err("Cannot convert to callable".to_string())}
+            EvalValue::RValue(x) => {Ok(x.clone())}
+            EvalValue::LValue(x) => {Ok(x.to_literal())}
         }
     }
 
@@ -61,8 +64,63 @@ impl Callable for BuiltinFunctionTime {
     fn arity(&self) -> usize {
         0
     }
+
+    fn to_literal(&self) -> LiteralValue {
+        LiteralValue::String("<fn builtin time>".to_string())
+    }
 }
 
+struct LoxFunction {
+    name: String,
+    params: Vec<String>,
+    body: ast::statement::FuncBody
+}
+
+impl LoxFunction {
+    fn new(function: &Function) -> Self {
+        let name = if let TokenType::Identifier(n) = &function.name.token_type {
+            n.clone()
+        } else { panic!("Parser fucked up") };
+
+        let params: Vec<String> =
+        function.params.iter().map(
+            |x| {
+                if let TokenType::Identifier(i) = &x.token_type {
+                    i.clone()
+                }
+                else {
+                    panic!("Parser fucked up with functions");
+                }
+            }
+        ).collect();
+
+        LoxFunction {
+            name,
+            params,
+            body: function.body.clone() // Get new reference count
+        }
+    }
+}
+impl Callable for LoxFunction {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue {
+        let enclosing = interpreter.environment_stack.current_frame();
+        let my_frame = interpreter.environment_stack.push_frame(enclosing);
+
+        for (arg_name, arg_value) in self.params.iter().zip(arguments) {
+            interpreter.environment_stack.define(my_frame, arg_name, &arg_value);
+        }
+        self.body.accept(interpreter).unwrap(); // TODO:  Return a proper error
+        EvalValue::RValue(LiteralValue::Nil)
+    }
+
+    fn arity(&self) -> usize {
+        self.params.len()
+    }
+
+    fn to_literal(&self) -> LiteralValue {
+        LiteralValue::String(format!("<fn {} >", self.name))
+    }
+}
 
 impl Environment {
     pub fn new(enclosing: Option<usize>) -> Self {
@@ -88,8 +146,9 @@ impl EnvironmentStack {
         self.environment_stack[idx].define(name, value);
     }
 
-    pub fn push_frame(&mut self, enclosing: Option<usize>) {
+    pub fn push_frame(&mut self, enclosing: Option<usize>) -> Option<usize> {
         self.environment_stack.push(Environment::new(enclosing));
+        self.current_frame()
     }
     pub fn pop_frame(&mut self) {
         self.environment_stack.pop();
@@ -101,6 +160,10 @@ impl EnvironmentStack {
         } else{
             Some(self.environment_stack.len() - 1)
         }
+    }
+
+    pub fn global_frame(&self) -> Option<usize> {
+        Some(0)
     }
 
     pub fn assign(
@@ -205,12 +268,26 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_function(&mut self, visitor: &Function) -> Result<(), String> {
-        todo!()
+    fn visit_function(&mut self, function: &Function) -> Result<(), String> {
+        let name = if let TokenType::Identifier(name) = &function.name.token_type {
+            name
+        } else {
+            panic!("Parser messed up function token");
+        };
+        self.environment_stack.define(
+            self.environment_stack.current_frame(),
+            name,
+            &EvalValue::LValue(
+                Rc::new(
+                    Box::new(LoxFunction::new(function))
+                )
+            )
+        );
+        Ok(())
     }
 
     fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
-        if is_truthy(ifstmt.condition.accept(self)?.get_literal()?) {
+        if is_truthy(&ifstmt.condition.accept(self)?.get_literal()?) {
             ifstmt.then_branch.accept(self)?;
         } else {
             ifstmt.else_branch.accept(self)?;
@@ -253,7 +330,7 @@ impl StmtVisitor<Result<(), String>> for Interpreter
     }
 
     fn visit_while(&mut self, whilestmt: &While) -> Result<(), String> {
-        while is_truthy(whilestmt.condition.accept(self)?.get_literal()?) {
+        while is_truthy(&whilestmt.condition.accept(self)?.get_literal()?) {
             whilestmt.body.accept(self)?;
         }
         Ok(())
@@ -383,7 +460,7 @@ impl AstVisitor<RunValue> for Interpreter {
             }
 
             TokenType::Bang => {
-                Ok(LiteralValue::Boolean(!is_truthy(right.get_literal()?)).into())
+                Ok(LiteralValue::Boolean(!is_truthy(&right.get_literal()?)).into())
             }
             _ => Err("Unknown unary operator".to_string())
         };
