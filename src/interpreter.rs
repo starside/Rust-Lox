@@ -101,11 +101,11 @@ impl LoxFunction {
 }
 impl Callable for LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue {
-        let enclosing = interpreter.environment_stack.global_frame();
+        let enclosing = interpreter.environment_stack.current_frame();
         let my_frame = interpreter.environment_stack.push_frame(enclosing);
 
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
-            interpreter.environment_stack.define(my_frame, arg_name, &arg_value);
+            interpreter.environment_stack.define(my_frame, arg_name, arg_value);
         }
         let run_result = self.body.accept(interpreter);
         interpreter.environment_stack.pop_frame();
@@ -134,8 +134,8 @@ impl Environment {
         Environment {enclosing, values: HashMap::new()}
     }
 
-    pub fn define(&mut self, name: &str, value: &EvalValue) {
-        self.values.insert(String::from(name), value.clone());
+    pub fn define(&mut self, name: &str, value: EvalValue) {
+        self.values.insert(String::from(name), value);
     }
 }
 
@@ -154,7 +154,7 @@ impl EnvironmentStack {
         EnvironmentStack{environment_stack: vec![Environment::new(None)]}
     }
 
-    pub fn define(&mut self, scope_id: Option<usize>, name: &str, value: &EvalValue) {
+    pub fn define(&mut self, scope_id: Option<usize>, name: &str, value: EvalValue) {
         let idx = scope_id.unwrap();
         self.environment_stack[idx].define(name, value);
     }
@@ -239,7 +239,7 @@ pub struct Interpreter {
 impl<'a> Interpreter {
     pub fn new() -> Self {
         let mut es = EnvironmentStack::new();
-        es.define(es.current_frame(),"time", &EvalValue::LValue(
+        es.define(es.current_frame(),"time", EvalValue::LValue(
             Rc::new(Box::new(BuiltinFunctionTime))
         ));
         Interpreter{environment_stack: es, boot_time: Instant::now()}
@@ -298,7 +298,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
         self.environment_stack.define(
             self.environment_stack.current_frame(),
             name,
-            &EvalValue::LValue(
+            EvalValue::LValue(
                 Rc::new(
                     Box::new(LoxFunction::new(function))
                 )
@@ -349,13 +349,13 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     fn visit_var(&mut self, stmt: &Var) -> Result<(), Unwinder> {
         let value = match stmt.initializer {
             ast::expression::Expr::Empty => {
-                LiteralValue::Nil
+                EvalValue::RValue(LiteralValue::Nil)
             }
             _ => {
-                stmt.initializer.accept(self)?.get_literal()?.clone()
+                stmt.initializer.accept(self)?
             }
         };
-        self.environment_stack.define(self.environment_stack.current_frame(), &stmt.name, &EvalValue::RValue(value));
+        self.environment_stack.define(self.environment_stack.current_frame(), &stmt.name, value);
         Ok(())
     }
 
