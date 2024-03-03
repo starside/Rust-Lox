@@ -8,7 +8,7 @@ use std::time::{Instant};
 
 
 pub trait Callable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, String>;
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
 }
@@ -65,10 +65,10 @@ struct Environment {
 struct BuiltinFunctionTime;
 
 impl Callable for BuiltinFunctionTime {
-    fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> EvalValue {
-        EvalValue::RValue(LiteralValue::Number(
+    fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> Result<EvalValue, String> {
+        Ok(EvalValue::RValue(LiteralValue::Number(
             Instant::now().duration_since(interpreter.boot_time).as_micros() as f64
-        ))
+        )))
     }
     fn arity(&self) -> usize {
         0
@@ -159,7 +159,7 @@ impl LoxFunction {
     }
 }
 impl Callable for LoxFunction {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, String> {
         let enclosing = interpreter.environment_stack.current_frame();
         let my_frame = interpreter.environment_stack.push_frame(enclosing);
 
@@ -171,13 +171,15 @@ impl Callable for LoxFunction {
         interpreter.environment_stack.pop_frame();
         if let Err(unwinder) =  run_result {
             match unwinder {
-                Unwinder::RuntimeError(_) => {panic!("Runtime error, code shouldn't panic here but does out of laziness")}
+                Unwinder::RuntimeError(e) => {
+                    return Err(e);
+                }
                 Unwinder::ReturnValue(val) => {
-                    return val;
+                    return Ok(val);
                 }
             }
         }
-        EvalValue::RValue(LiteralValue::Nil)
+        Ok(EvalValue::RValue(LiteralValue::Nil))
     }
 
     fn arity(&self) -> usize {
@@ -509,7 +511,7 @@ impl AstVisitor<RunValue> for Interpreter {
             arguments.push(argument.accept(self)?);
         }
 
-        Ok(callee.call(self, arguments))
+        Ok(callee.call(self, arguments)?)
     }
 
     fn visit_grouping(&mut self, visitor: &Grouping) -> RunValue {
