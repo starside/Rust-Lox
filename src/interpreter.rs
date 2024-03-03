@@ -275,9 +275,16 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
         self.environment_stack.push_frame(self.environment_stack.current_frame());
         for statement in block.statements.iter() {
             let res = statement.accept(self);
-            if let Err(Unwinder::ReturnValue(rv)) = res {
+            if let Err(unwind) = res {
                 self.environment_stack.pop_frame();
-                return Err(Unwinder::ReturnValue(rv));
+                match unwind {
+                    Unwinder::RuntimeError(e) => {
+                        return Err(Unwinder::RuntimeError(e));
+                    }
+                    Unwinder::ReturnValue(u) => {
+                        return Err(Unwinder::ReturnValue(u));
+                    }
+                }
             }
         }
         self.environment_stack.pop_frame();
