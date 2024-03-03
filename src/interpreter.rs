@@ -35,6 +35,17 @@ impl EvalValue {
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
     }
+
+    pub fn debug_string(&self) -> String {
+        match self {
+            EvalValue::RValue(x) => {
+                format!("RValue={:?}", x)
+            }
+            EvalValue::LValue(x) => {
+                format!("LValue={:?}", x.to_literal())
+            }
+        }
+    }
 }
 
 impl From<LiteralValue> for EvalValue{
@@ -74,6 +85,54 @@ struct LoxFunction {
     body: ast::statement::FuncBody
 }
 
+struct DebugStatements;
+impl StmtVisitor<()> for DebugStatements {
+    fn visit_block(&mut self, visitor: &Block) -> () {
+        println!("#### Block;");
+        let mut i: usize = 0;
+        while i < visitor.statements.len(){
+            println!("Stmt {}: ", i);
+            visitor.statements[i].accept(self);
+            i += 1;
+        }
+    }
+
+    fn visit_expression(&mut self, visitor: &Expression) -> () {
+        println!("#### Expression;");
+    }
+
+    fn visit_function(&mut self, visitor: &Function) -> () {
+        println!("#### Function body:");
+        visitor.body.accept(self);
+    }
+
+    fn visit_if(&mut self, visitor: &If) -> () {
+        println!("{{<If>");
+        println!("#### If then branch;");
+        visitor.then_branch.accept(self);
+        println!("#### If else branch;");
+        visitor.else_branch.accept(self);
+        println!("}}If");
+    }
+
+    fn visit_print(&mut self, visitor: &Print) -> () {
+        println!("#### Print;");
+    }
+
+    fn visit_return(&mut self, visitor: &Return) -> () {
+        println!("#### Return;");
+    }
+
+    fn visit_var(&mut self, visitor: &Var) -> () {
+        println!("#### Var {} ;", visitor.name);
+    }
+
+    fn visit_while(&mut self, visitor: &While) -> () {
+        println!("#### While body;");
+        visitor.body.accept(self);
+    }
+}
+
 impl LoxFunction {
     fn new(function: &Function) -> Self {
         let name = if let TokenType::Identifier(n) = &function.name.token_type {
@@ -92,6 +151,10 @@ impl LoxFunction {
             }
         ).collect();
 
+        println!("Creating function named {} with {} args.  Body has statements:", name, function.params.len());
+        let mut ds = DebugStatements;
+        function.body.accept(&mut ds);
+
         LoxFunction {
             name,
             params,
@@ -107,7 +170,11 @@ impl Callable for LoxFunction {
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
             interpreter.environment_stack.define(my_frame, arg_name, arg_value);
         }
+        println!("Calling function {}", self.name);
+        let mut df = DebugStatements;
+        self.body.accept(&mut df);
         let run_result = self.body.accept(interpreter);
+        println!("Done calling function {}", self.name);
         interpreter.environment_stack.pop_frame();
         if let Err(unwinder) =  run_result {
             match unwinder {
@@ -156,6 +223,7 @@ impl EnvironmentStack {
 
     pub fn define(&mut self, scope_id: Option<usize>, name: &str, value: EvalValue) {
         let idx = scope_id.unwrap();
+        println!("Defining {} in scope {} with value {}", name, idx, value.debug_string());
         self.environment_stack[idx].define(name, value);
     }
 
@@ -350,6 +418,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     fn visit_return(&mut self, ret: &Return) -> Result<(), Unwinder> {
         let value = ret.value.accept(self)?;
         // Indicate we should unwind to call size and pass return value, not an error
+        println!("Returning {}", value.debug_string());
         Err(Unwinder::ReturnValue(value))
     }
 
