@@ -151,10 +151,6 @@ impl LoxFunction {
             }
         ).collect();
 
-        println!("Creating function named {} with {} args.  Body has statements:", name, function.params.len());
-        let mut ds = DebugStatements;
-        function.body.accept(&mut ds);
-
         LoxFunction {
             name,
             params,
@@ -170,11 +166,8 @@ impl Callable for LoxFunction {
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
             interpreter.environment_stack.define(my_frame, arg_name, arg_value);
         }
-        println!("Calling function {}", self.name);
-        let mut df = DebugStatements;
-        self.body.accept(&mut df);
+
         let run_result = self.body.accept(interpreter);
-        println!("Done calling function {}", self.name);
         interpreter.environment_stack.pop_frame();
         if let Err(unwinder) =  run_result {
             match unwinder {
@@ -223,7 +216,6 @@ impl EnvironmentStack {
 
     pub fn define(&mut self, scope_id: Option<usize>, name: &str, value: EvalValue) {
         let idx = scope_id.unwrap();
-        println!("Defining {} in scope {} with value {}", name, idx, value.debug_string());
         self.environment_stack[idx].define(name, value);
     }
 
@@ -418,7 +410,6 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     fn visit_return(&mut self, ret: &Return) -> Result<(), Unwinder> {
         let value = ret.value.accept(self)?;
         // Indicate we should unwind to call size and pass return value, not an error
-        println!("Returning {}", value.debug_string());
         Err(Unwinder::ReturnValue(value))
     }
 
