@@ -8,7 +8,7 @@ use enum_kinds::EnumKind;
 extern crate lox_derive_ast;
 use crate::parser::Parser;
 use crate::{scanner};
-use crate::interpreter::{Interpreter};
+use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 
 #[derive(Clone, Debug)]
@@ -115,6 +115,7 @@ pub mod ast {
             Function: Token name, TokenList params, FuncBody body;
             If: Expr condition, Stmt then_branch, Stmt else_branch;
             Print : Expr expression;
+            Return : Token keyword, Expr value;
             Var : VarName name, Expr initializer;
             While : Expr condition, Stmt body;
         );
@@ -135,8 +136,14 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                 Ok(statements) => {
                     let mut interpreter = Interpreter::new();
                     for s in statements {
-                        if let Err(err) = s.accept(&mut interpreter) {
-                            println!("Runtime Error: {}", err);
+                        if let Err(unwind) = s.accept(&mut interpreter) {
+                            match unwind {
+                                Unwinder::RuntimeError(err) => {println!("Runtime Error: {}", err);}
+                                Unwinder::ReturnValue(_) => {
+                                    println!("Interpreter returned a value");
+                                }
+                            }
+
                         }
                     }
                 }

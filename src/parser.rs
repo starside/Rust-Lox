@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use crate::lox::ast::LiteralValue;
 use crate::lox::{ast, Token, TokenKind, TokenType};
-use crate::lox::ast::expression::{Binary, Call, Expr, Unary};
+use crate::lox::ast::expression::{Binary, Call, Expr, Literal, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
 
 pub struct Parser<'a> {
@@ -573,7 +573,31 @@ impl<'a> Parser<'a> {
         if self.match_token(&[TokenKind::For]) {
             return self.for_statement();
         }
+        if self.match_token(&[TokenKind::Return]) {
+            return self.return_statement();
+        }
         self.expression_statement()
+    }
+
+    fn return_statement(&mut self) -> StatementResult {
+        let keyword = self.previous().clone();
+
+        let value = if !self.check(&[TokenKind::Semicolon]) {
+            self.expression()?
+        } else {
+            Expr::Literal(Box::new(Literal{value: LiteralValue::Nil}))
+        };
+
+        self.consume(TokenKind::Semicolon, "Expect ';' after return value".to_string())?;
+
+        Ok(
+            Stmt::Return(
+                Box::new(ast::statement::Return{
+                    keyword,
+                    value
+                })
+            )
+        )
     }
 
     fn block(&mut self) -> StatementResult {

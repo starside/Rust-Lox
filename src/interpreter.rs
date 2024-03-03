@@ -1,15 +1,13 @@
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Stmt, StmtVisitor, Var, While};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::str::from_utf8_unchecked;
 use std::time::{Instant};
-use crate::lox;
 
 
-trait Callable {
+pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue;
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
@@ -18,22 +16,22 @@ trait Callable {
 type LValueType = Rc<Box<dyn Callable>>;
 
 #[derive(Clone)]
-enum EvalValue {
+pub enum EvalValue {
     RValue(LiteralValue),
     LValue(LValueType)
 }
 
 impl EvalValue {
-    pub fn get_literal(&self) -> Result<LiteralValue, String> {
+    pub fn get_literal(&self) -> Result<LiteralValue, Unwinder> {
         match self {
             EvalValue::RValue(x) => {Ok(x.clone())}
             EvalValue::LValue(x) => {Ok(x.to_literal())}
         }
     }
 
-    pub fn get_callable(&self) -> Result<LValueType, String> {
+    pub fn get_callable(&self) -> Result<LValueType, Unwinder> {
         match self {
-            EvalValue::RValue(_) => {Err("Cannot convert to callable".to_string())}
+            EvalValue::RValue(_) => {Err(Unwinder::RuntimeError("Cannot convert to callable".to_string()))}
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
     }
@@ -45,7 +43,7 @@ impl From<LiteralValue> for EvalValue{
     }
 }
 
-type RunValue = Result<EvalValue, String>;
+type RunValue = Result<EvalValue, Unwinder>;
 
 // Environment to store variables at some level of scope
 struct Environment {
@@ -103,13 +101,20 @@ impl LoxFunction {
 }
 impl Callable for LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> EvalValue {
-        let enclosing = interpreter.environment_stack.current_frame();
+        let enclosing = interpreter.environment_stack.global_frame();
         let my_frame = interpreter.environment_stack.push_frame(enclosing);
 
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
             interpreter.environment_stack.define(my_frame, arg_name, &arg_value);
         }
-        self.body.accept(interpreter).unwrap(); // TODO:  Return a proper error
+        if let Err(unwinder) = self.body.accept(interpreter) {
+            match unwinder {
+                Unwinder::RuntimeError(_) => {panic!("Runtime error, code shouldn't panic here but does out of laziness")}
+                Unwinder::ReturnValue(val) => {
+                    return val;
+                }
+            }
+        }
         EvalValue::RValue(LiteralValue::Nil)
     }
 
@@ -134,6 +139,12 @@ impl Environment {
 
 struct EnvironmentStack {
     environment_stack: Vec<Environment>
+}
+
+impl From<String> for Unwinder {
+    fn from(value: String) -> Self {
+        Unwinder::RuntimeError(value)
+    }
 }
 
 impl EnvironmentStack {
@@ -214,7 +225,7 @@ impl EnvironmentStack {
                 }
             }
         }
-        Err(format!("Undefined variable'{}'", name).to_string())
+        Err(Unwinder::RuntimeError(format!("Undefined variable'{}'", name).to_string()))
     }
 }
 
@@ -252,9 +263,13 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
     }
 }
 
-impl StmtVisitor<Result<(), String>> for Interpreter
+pub enum Unwinder {
+    RuntimeError(String),
+    ReturnValue(EvalValue)
+}
+impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 {
-    fn visit_block(&mut self, block: &Block) -> Result<(), String> {
+    fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
         self.environment_stack.push_frame(self.environment_stack.current_frame());
         for statement in block.statements.iter() {
             statement.accept(self)?
@@ -263,12 +278,12 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_expression(&mut self, expression: &Expression) -> Result<(), String> {
+    fn visit_expression(&mut self, expression: &Expression) -> Result<(), Unwinder> {
         expression.expression.accept(self)?;
         Ok(())
     }
 
-    fn visit_function(&mut self, function: &Function) -> Result<(), String> {
+    fn visit_function(&mut self, function: &Function) -> Result<(), Unwinder> {
         let name = if let TokenType::Identifier(name) = &function.name.token_type {
             name
         } else {
@@ -286,16 +301,19 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
+    fn visit_if(&mut self, ifstmt: &If) -> Result<(), Unwinder> {
         if is_truthy(&ifstmt.condition.accept(self)?.get_literal()?) {
             ifstmt.then_branch.accept(self)?;
         } else {
-            ifstmt.else_branch.accept(self)?;
+            if let Stmt::Empty = ifstmt.else_branch {}
+            else {
+                ifstmt.else_branch.accept(self)?;
+            }
         }
         Ok(())
     }
 
-    fn visit_print(&mut self, print: &Print) -> Result<(), String> {
+    fn visit_print(&mut self, print: &Print) -> Result<(), Unwinder> {
         let value = print.expression.accept(self)?;
         let value = value.get_literal()?;
 
@@ -316,7 +334,13 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_var(&mut self, stmt: &Var) -> Result<(), String> {
+    fn visit_return(&mut self, ret: &Return) -> Result<(), Unwinder> {
+        let value = ret.value.accept(self)?;
+        // Indicate we should unwind to call size and pass return value, not an error
+        Err(Unwinder::ReturnValue(value))
+    }
+
+    fn visit_var(&mut self, stmt: &Var) -> Result<(), Unwinder> {
         let value = match stmt.initializer {
             ast::expression::Expr::Empty => {
                 LiteralValue::Nil
@@ -329,7 +353,7 @@ impl StmtVisitor<Result<(), String>> for Interpreter
         Ok(())
     }
 
-    fn visit_while(&mut self, whilestmt: &While) -> Result<(), String> {
+    fn visit_while(&mut self, whilestmt: &While) -> Result<(), Unwinder> {
         while is_truthy(&whilestmt.condition.accept(self)?.get_literal()?) {
             whilestmt.body.accept(self)?;
         }
@@ -368,7 +392,7 @@ impl AstVisitor<RunValue> for Interpreter {
                         Ok(LiteralValue::Boolean(is_equal(&left, &right)).into())
                     }
                     _ => {
-                        Err("Invalid binary operation between strings".to_string())
+                        Err("Invalid binary operation between strings".to_string().into())
                     }
                 }
 
@@ -387,12 +411,12 @@ impl AstVisitor<RunValue> for Interpreter {
                     TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r).into())}
                     TokenType::Less => {Ok(LiteralValue::Boolean(l < r).into())}
                     TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r).into())}
-                    _ => Err("Unknown operand between two Numbers".to_string())
+                    _ => Err("Unknown operand between two Numbers".to_string().into())
                 }
             }
 
             _ => {
-                Err("Operands must be two numbers or two strings".to_string())
+                Err("Operands must be two numbers or two strings".to_string().into())
             }
         }
     }
@@ -404,7 +428,7 @@ impl AstVisitor<RunValue> for Interpreter {
         if expr.arguments.len() != callee.arity(){
             let err = format!("Line {}, expected {} but got {} arguments",
                               expr.paren.line, callee.arity(), expr.arguments.len());
-            return Err(err);
+            return Err(err.into());
         }
 
         let mut arguments: Vec<EvalValue> = Vec::new();
@@ -460,12 +484,18 @@ impl AstVisitor<RunValue> for Interpreter {
             }
 
             TokenType::Bang => {
-                Ok(LiteralValue::Boolean(!is_truthy(&right.get_literal()?)).into())
+                Ok(
+                    EvalValue::from(
+                        LiteralValue::Boolean(
+                            is_truthy(&right.get_literal()?)
+                        )
+                    )
+                )
             }
             _ => Err("Unknown unary operator".to_string())
         };
 
-        value
+        Ok(value?)
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
