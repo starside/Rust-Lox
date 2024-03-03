@@ -107,7 +107,9 @@ impl Callable for LoxFunction {
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
             interpreter.environment_stack.define(my_frame, arg_name, &arg_value);
         }
-        if let Err(unwinder) = self.body.accept(interpreter) {
+        let run_result = self.body.accept(interpreter);
+        interpreter.environment_stack.pop_frame();
+        if let Err(unwinder) =  run_result {
             match unwinder {
                 Unwinder::RuntimeError(_) => {panic!("Runtime error, code shouldn't panic here but does out of laziness")}
                 Unwinder::ReturnValue(val) => {
@@ -272,7 +274,11 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
         self.environment_stack.push_frame(self.environment_stack.current_frame());
         for statement in block.statements.iter() {
-            statement.accept(self)?
+            let res = statement.accept(self);
+            if let Err(Unwinder::ReturnValue(rv)) = res {
+                self.environment_stack.pop_frame();
+                return Err(Unwinder::ReturnValue(rv));
+            }
         }
         self.environment_stack.pop_frame();
         Ok(())
