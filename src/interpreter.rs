@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
@@ -58,7 +59,7 @@ type RunValue = Result<EvalValue, Unwinder>;
 
 // Environment to store variables at some level of scope
 struct Environment {
-    enclosing: Option<usize>,
+    enclosing: Option<EnvironmentRef>,
     values: HashMap<String, EvalValue>
 }
 
@@ -82,7 +83,8 @@ impl Callable for BuiltinFunctionTime {
 struct LoxFunction {
     name: String,
     params: Vec<String>,
-    body: ast::statement::FuncBody
+    body: ast::statement::FuncBody,
+    closure: EnvironmentRef
 }
 
 struct DebugStatements;
@@ -134,7 +136,7 @@ impl StmtVisitor<()> for DebugStatements {
 }
 
 impl LoxFunction {
-    fn new(function: &Function) -> Self {
+    fn new(function: &Function, closure: EnvironmentRef) -> Self {
         let name = if let TokenType::Identifier(n) = &function.name.token_type {
             n.clone()
         } else { panic!("Parser fucked up") };
@@ -154,21 +156,20 @@ impl LoxFunction {
         LoxFunction {
             name,
             params,
-            body: function.body.clone() // Get new reference count
+            body: function.body.clone(), // Get new reference count
+            closure
         }
     }
 }
 impl Callable for LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, String> {
-        let enclosing = interpreter.environment_stack.current_frame();
-        let my_frame = interpreter.environment_stack.push_frame(enclosing);
+        let environment = Environment::new(Some(self.closure.clone()));
 
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
-            interpreter.environment_stack.define(my_frame, arg_name, arg_value);
+            environment.borrow_mut().define(arg_name, arg_value);
         }
 
         let run_result = self.body.accept(interpreter);
-        interpreter.environment_stack.pop_frame();
         if let Err(unwinder) =  run_result {
             match unwinder {
                 Unwinder::RuntimeError(e) => {
@@ -191,18 +192,69 @@ impl Callable for LoxFunction {
     }
 }
 
+pub type EnvironmentRef = Rc<RefCell<Environment>>;
+
 impl Environment {
-    pub fn new(enclosing: Option<usize>) -> Self {
-        Environment {enclosing, values: HashMap::new()}
+    pub fn new(enclosing: Option<EnvironmentRef>) -> EnvironmentRef {
+        Rc::new(
+            RefCell::new(
+                Environment {
+                    enclosing,
+                    values: HashMap::new()
+                }
+            )
+        )
     }
 
     pub fn define(&mut self, name: &str, value: EvalValue) {
         self.values.insert(String::from(name), value);
     }
-}
 
-struct EnvironmentStack {
-    environment_stack: Vec<Environment>
+    pub fn assign(
+        &mut self,
+        name: &String,
+        value: &EvalValue) -> Result<(),String> {
+
+        // Check current scope
+        if self.values.contains_key(name) {
+            self.values.insert(name.clone(), value.clone());
+            return Ok(());
+        }
+
+        // Search enclosing scopes
+        let mut current_env = self.enclosing.clone();
+        while let Some(env) = current_env {
+            let has_key = env.borrow().values.contains_key(name);
+            if has_key {
+                env.borrow_mut().values.insert(name.clone(), value.clone());
+                return Ok(());
+            }
+            current_env = env.borrow().enclosing.clone();
+        }
+
+        Err(format!("L-value {} is not defined but was assigned to", &name).to_string())
+    }
+
+    pub fn get(
+        &self,
+        name: &String) -> Result<EvalValue, String> {
+
+        // Check current scope
+        if let Some(val) = self.values.get(name) {
+            return Ok(val.clone());
+        }
+
+        // Search enclosing scopes
+        let mut current_env = self.enclosing.clone();
+        while let Some(env) = current_env {
+            if let Some(val) = env.borrow().values.get(name) {
+                return Ok(val.clone());
+            }
+            current_env = env.borrow().enclosing.clone();
+        }
+
+        Err(format!("L-value {} is not defined but was assigned to", &name).to_string())
+    }
 }
 
 impl From<String> for Unwinder {
@@ -211,100 +263,21 @@ impl From<String> for Unwinder {
     }
 }
 
-impl EnvironmentStack {
-    pub fn new() -> Self {
-        EnvironmentStack{environment_stack: vec![Environment::new(None)]}
-    }
-
-    pub fn define(&mut self, scope_id: Option<usize>, name: &str, value: EvalValue) {
-        let idx = scope_id.unwrap();
-        self.environment_stack[idx].define(name, value);
-    }
-
-    pub fn push_frame(&mut self, enclosing: Option<usize>) -> Option<usize> {
-        self.environment_stack.push(Environment::new(enclosing));
-        self.current_frame()
-    }
-    pub fn pop_frame(&mut self) {
-        self.environment_stack.pop();
-    }
-
-    pub fn current_frame(&self) -> Option<usize> {
-        if self.environment_stack.is_empty() {
-            None
-        } else{
-            Some(self.environment_stack.len() - 1)
-        }
-    }
-
-    pub fn global_frame(&self) -> Option<usize> {
-        Some(0)
-    }
-
-    pub fn assign(
-        &mut self,
-        scope_id: Option<usize>,
-        name: &String,
-        value: &EvalValue) -> Result<(),String> {
-
-        if let Some(scope_id) = scope_id {
-            let name = name.clone();
-
-            // First check current scope
-            if self.environment_stack[scope_id].values.contains_key(&name) {
-                self.environment_stack[scope_id].values.insert(name, value.clone());
-                return Ok(());
-            }
-
-            // Follow enclosing scopes up the stack
-            let mut enclosing_idx = self.environment_stack[scope_id].enclosing;
-            while let Some(e) = enclosing_idx {
-                if self.environment_stack[e].values.contains_key(&name) {
-                    self.environment_stack[e].values.insert(name, value.clone());
-                    return Ok(());
-                } else {
-                    enclosing_idx = self.environment_stack[e].enclosing;
-                }
-            }
-        }
-
-        Err(format!("L-value {} is not defined but was assigned to", &name).to_string())
-    }
-
-    pub fn get(&mut self, scope_id: Option<usize>, name: &str) -> RunValue{
-
-        if let Some(scope_id) = scope_id {
-            // First check current scope
-            if  let Some(v) = self.environment_stack[scope_id].values.get(name) {
-                return Ok(v.clone());
-            }
-
-            // Follow enclosing scopes up the stack
-            let mut enclosing_idx = self.environment_stack[scope_id].enclosing;
-            while let Some(e) = enclosing_idx {
-                if let Some(v) = self.environment_stack[e].values.get(name) {
-                    return Ok(v.clone());
-                } else {
-                    enclosing_idx = self.environment_stack[e].enclosing;
-                }
-            }
-        }
-        Err(Unwinder::RuntimeError(format!("Undefined variable'{}'", name).to_string()))
-    }
-}
-
 pub struct Interpreter {
-    environment_stack: EnvironmentStack,
+    environment: EnvironmentRef,
     boot_time: Instant
 }
 
 impl<'a> Interpreter {
     pub fn new() -> Self {
-        let mut es = EnvironmentStack::new();
-        es.define(es.current_frame(),"time", EvalValue::LValue(
-            Rc::new(Box::new(BuiltinFunctionTime))
-        ));
-        Interpreter{environment_stack: es, boot_time: Instant::now()}
+        let mut global_env = Environment::new(None);
+        {
+            let mut ge = global_env.borrow_mut();
+            ge.define("time", EvalValue::LValue(
+                Rc::new(Box::new(BuiltinFunctionTime))
+            ));
+        }
+        Interpreter{environment: global_env, boot_time: Instant::now()}
     }
 }
 
@@ -334,11 +307,11 @@ pub enum Unwinder {
 impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 {
     fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
-        self.environment_stack.push_frame(self.environment_stack.current_frame());
+        let previous = self.environment.clone();
+        self.environment = Environment::new(Some(previous.clone()));
         for statement in block.statements.iter() {
             let res = statement.accept(self);
             if let Err(unwind) = res {
-                self.environment_stack.pop_frame();
                 match unwind {
                     Unwinder::RuntimeError(e) => {
                         return Err(Unwinder::RuntimeError(e));
@@ -349,7 +322,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
                 }
             }
         }
-        self.environment_stack.pop_frame();
+        self.environment = previous;
         Ok(())
     }
 
@@ -364,14 +337,16 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
         } else {
             panic!("Parser messed up function token");
         };
-        self.environment_stack.define(
-            self.environment_stack.current_frame(),
-            name,
-            EvalValue::LValue(
-                Rc::new(
-                    Box::new(LoxFunction::new(function))
-                )
+
+        let new_func = EvalValue::LValue(
+            Rc::new(
+                Box::new(LoxFunction::new(function, self.environment.clone()))
             )
+        );
+
+        self.environment.borrow_mut().define(
+            name,
+            new_func
         );
         Ok(())
     }
@@ -424,7 +399,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
                 stmt.initializer.accept(self)?
             }
         };
-        self.environment_stack.define(self.environment_stack.current_frame(), &stmt.name, value);
+        self.environment.borrow_mut().define(&stmt.name, value);
         Ok(())
     }
 
@@ -439,7 +414,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 impl AstVisitor<RunValue> for Interpreter {
     fn visit_assign(&mut self, expr: &Assign) -> RunValue {
         let value = expr.value.accept(self)?;
-        self.environment_stack.assign(self.environment_stack.current_frame(), &expr.name, &value)?;
+        self.environment.borrow_mut().assign(&expr.name, &value)?;
         return Ok(value);
     }
 
@@ -574,7 +549,7 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
-        let res = self.environment_stack.get(self.environment_stack.current_frame(), &varname.name);
-        res
+        let res = self.environment.borrow().get(&varname.name);
+        Ok(res?)
     }
 }
