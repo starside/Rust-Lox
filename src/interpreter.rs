@@ -4,6 +4,8 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::ptr;
 use std::rc::Rc;
 use std::time::{Instant};
 
@@ -23,10 +25,10 @@ pub enum EvalValue {
 }
 
 impl EvalValue {
-    pub fn get_literal(&self) -> Result<LiteralValue, Unwinder> {
+    pub fn get_literal(&self) -> LiteralValue {
         match self {
-            EvalValue::RValue(x) => {Ok(x.clone())}
-            EvalValue::LValue(x) => {Ok(x.to_literal())}
+            EvalValue::RValue(x) => {x.clone()}
+            EvalValue::LValue(x) => {x.to_literal()}
         }
     }
 
@@ -169,7 +171,17 @@ impl Callable for LoxFunction {
             environment.borrow_mut().define(arg_name, arg_value);
         }
 
-        let run_result = self.body.accept(interpreter);
+        //
+        let binding = self.body.clone();
+        let a = binding.as_ref();
+        let run_result = if let Stmt::Block(x) = a.as_ref() {
+            interpreter.executeBlock(&x.statements, environment)
+        } else {
+            Err(
+                Unwinder::RuntimeError("Somehow not executing a block.  This is a bug".to_string())
+            )
+        };
+
         if let Err(unwinder) =  run_result {
             match unwinder {
                 Unwinder::RuntimeError(e) => {
@@ -245,6 +257,7 @@ impl Environment {
         }
 
         // Search enclosing scopes
+
         let mut current_env = self.enclosing.clone();
         while let Some(env) = current_env {
             if let Some(val) = env.borrow().values.get(name) {
@@ -253,7 +266,7 @@ impl Environment {
             current_env = env.borrow().enclosing.clone();
         }
 
-        Err(format!("L-value {} is not defined but was assigned to", &name).to_string())
+        Err(format!("Variable  {} is not found", &name).to_string())
     }
 }
 
@@ -304,14 +317,18 @@ pub enum Unwinder {
     RuntimeError(String),
     ReturnValue(EvalValue)
 }
-impl StmtVisitor<Result<(), Unwinder>> for Interpreter
-{
-    fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
+
+impl Interpreter {
+    fn executeBlock(self: &mut Interpreter ,
+                    statements: &ast::statement::StmtList,
+                    environment: EnvironmentRef) -> Result<(), Unwinder> {
         let previous = self.environment.clone();
-        self.environment = Environment::new(Some(previous.clone()));
-        for statement in block.statements.iter() {
+        self.environment = environment;
+
+        for statement in statements.iter() {
             let res = statement.accept(self);
             if let Err(unwind) = res {
+                self.environment = previous;
                 match unwind {
                     Unwinder::RuntimeError(e) => {
                         return Err(Unwinder::RuntimeError(e));
@@ -323,6 +340,16 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
             }
         }
         self.environment = previous;
+        Ok(())
+    }
+}
+
+impl StmtVisitor<Result<(), Unwinder>> for Interpreter
+{
+    fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
+        let new_env = Environment::new(Some(self.environment.clone()));
+        self.executeBlock(&block.statements,
+                          new_env)?;
         Ok(())
     }
 
@@ -352,7 +379,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     }
 
     fn visit_if(&mut self, ifstmt: &If) -> Result<(), Unwinder> {
-        if is_truthy(&ifstmt.condition.accept(self)?.get_literal()?) {
+        if is_truthy(&ifstmt.condition.accept(self)?.get_literal()) {
             ifstmt.then_branch.accept(self)?;
         } else {
             if let Stmt::Empty = ifstmt.else_branch {}
@@ -365,7 +392,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
     fn visit_print(&mut self, print: &Print) -> Result<(), Unwinder> {
         let value = print.expression.accept(self)?;
-        let value = value.get_literal()?;
+        let value = value.get_literal();
 
         match value {
             LiteralValue::String(x) => {
@@ -404,7 +431,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     }
 
     fn visit_while(&mut self, whilestmt: &While) -> Result<(), Unwinder> {
-        while is_truthy(&whilestmt.condition.accept(self)?.get_literal()?) {
+        while is_truthy(&whilestmt.condition.accept(self)?.get_literal()) {
             whilestmt.body.accept(self)?;
         }
         Ok(())
@@ -420,9 +447,9 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_binary(&mut self, visitor: &Binary) -> RunValue {
         let left = visitor.left.accept(self)?;
-        let left = left.get_literal()?;
+        let left = left.get_literal();
         let right = visitor.right.accept(self)?;
-        let right = right.get_literal()?;
+        let right = right.get_literal();
 
         match (&left, &right) {
             // If both operands are strings
@@ -499,7 +526,7 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_logical(&mut self, logical: &Logical) -> RunValue {
         let left = logical.left.accept(self)?;
-        let left = left.get_literal()?;
+        let left = left.get_literal();
 
         match logical.operator.token_type {
             TokenType::And => {
@@ -525,7 +552,7 @@ impl AstVisitor<RunValue> for Interpreter {
 
         let value = match visitor.operator.token_type {
             TokenType::Minus => {
-                if let LiteralValue::Number(x) = right.get_literal()? {
+                if let LiteralValue::Number(x) = right.get_literal() {
                     Ok(LiteralValue::Number(-x).into())
                 }
                 else {
@@ -537,7 +564,7 @@ impl AstVisitor<RunValue> for Interpreter {
                 Ok(
                     EvalValue::from(
                         LiteralValue::Boolean(
-                            is_truthy(&right.get_literal()?)
+                            is_truthy(&right.get_literal())
                         )
                     )
                 )

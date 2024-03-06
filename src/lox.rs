@@ -120,7 +120,7 @@ pub mod ast {
             While : Expr condition, Stmt body;
         );
 
-        type StmtList = Vec<Stmt>;
+        pub(crate) type StmtList = Vec<Stmt>;
         type TokenList = Vec<Token>;
         pub type FuncBody = Rc<Box<Stmt>>; // Can I eliminate this with lifetimes?
     }
