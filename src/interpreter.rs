@@ -49,7 +49,7 @@ type RunValue = Result<EvalValue, Unwinder>;
 
 // The AST uses pinned allocations so I can generate a hash based on the pointer value,
 // And don't need to store a GUID or something else on each AST node
-type ExprId = *const u8;
+pub type ExprId = usize;
 
 // Environment to store variables at some level of scope
 pub struct Environment {

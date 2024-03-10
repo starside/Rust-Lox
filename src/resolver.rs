@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use crate::interpreter::Interpreter;
+use std::ptr::addr_of;
+use crate::interpreter::{ExprId, Interpreter};
 use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept, Block, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{TokenType};
@@ -56,7 +57,7 @@ impl<'i> Resolver<'i> {
         let idx = (0..self.scopes.len()).rev();
         for (i, scope) in idx.zip(self.scopes.iter()) {
             if scope.contains_key(name) {
-                todo!();//self.interpreter.resolve(expr, scopes.len() - i - 1);
+                self.interpreter.resolve(addr_of!(expr) as ExprId, i);
                 return;
             }
         }
