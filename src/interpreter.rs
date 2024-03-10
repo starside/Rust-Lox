@@ -47,6 +47,10 @@ impl From<LiteralValue> for EvalValue{
 
 type RunValue = Result<EvalValue, Unwinder>;
 
+// The AST uses pinned allocations so I can generate a hash based on the pointer value,
+// And don't need to store a GUID or something else on each AST node
+type ExprId = *const u8;
+
 // Environment to store variables at some level of scope
 pub struct Environment {
     enclosing: Option<EnvironmentRef>,
@@ -217,11 +221,13 @@ impl From<String> for Unwinder {
 
 pub struct Interpreter {
     environment: EnvironmentRef,
-    boot_time: Instant
+    boot_time: Instant,
+    locals: HashMap<ExprId, usize>
 }
 
 impl<'a> Interpreter {
     pub fn new() -> Self {
+        let locals: HashMap<ExprId, usize> = HashMap::new();
         let global_env = Environment::new(None);
         {
             let mut ge = global_env.borrow_mut();
@@ -229,7 +235,11 @@ impl<'a> Interpreter {
                 Rc::new(Box::new(BuiltinFunctionTime))
             ));
         }
-        Interpreter{environment: global_env, boot_time: Instant::now()}
+        Interpreter{environment: global_env, boot_time: Instant::now(), locals}
+    }
+
+    pub fn resolve(&mut self, expr: ExprId, depth: usize) {
+        self.locals.insert(expr, depth);
     }
 }
 
