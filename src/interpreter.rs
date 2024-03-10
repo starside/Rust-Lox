@@ -4,8 +4,6 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::ptr;
 use std::rc::Rc;
 use std::time::{Instant};
 
@@ -38,17 +36,6 @@ impl EvalValue {
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
     }
-
-    pub fn debug_string(&self) -> String {
-        match self {
-            EvalValue::RValue(x) => {
-                format!("RValue={:?}", x)
-            }
-            EvalValue::LValue(x) => {
-                format!("LValue={:?}", x.to_literal())
-            }
-        }
-    }
 }
 
 impl From<LiteralValue> for EvalValue{
@@ -60,7 +47,7 @@ impl From<LiteralValue> for EvalValue{
 type RunValue = Result<EvalValue, Unwinder>;
 
 // Environment to store variables at some level of scope
-struct Environment {
+pub struct Environment {
     enclosing: Option<EnvironmentRef>,
     values: HashMap<String, EvalValue>
 }
@@ -127,7 +114,7 @@ impl Callable for LoxFunction {
         let binding = self.body.clone();
         let a = binding.as_ref();
         let run_result = if let Stmt::Block(x) = a.as_ref() {
-            interpreter.executeBlock(&x.statements, environment)
+            interpreter.execute_block(&x.statements, environment)
         } else {
             Err(
                 Unwinder::RuntimeError("Somehow not executing a block.  This is a bug".to_string())
@@ -157,7 +144,6 @@ impl Callable for LoxFunction {
 }
 
 pub type EnvironmentRef = Rc<RefCell<Environment>>;
-
 impl Environment {
     pub fn new(enclosing: Option<EnvironmentRef>) -> EnvironmentRef {
         Rc::new(
@@ -235,7 +221,7 @@ pub struct Interpreter {
 
 impl<'a> Interpreter {
     pub fn new() -> Self {
-        let mut global_env = Environment::new(None);
+        let global_env = Environment::new(None);
         {
             let mut ge = global_env.borrow_mut();
             ge.define("time", EvalValue::LValue(
@@ -271,9 +257,9 @@ pub enum Unwinder {
 }
 
 impl Interpreter {
-    fn executeBlock(self: &mut Interpreter ,
-                    statements: &ast::statement::StmtList,
-                    environment: EnvironmentRef) -> Result<(), Unwinder> {
+    fn execute_block(self: &mut Interpreter,
+                     statements: &ast::statement::StmtList,
+                     environment: EnvironmentRef) -> Result<(), Unwinder> {
         let previous = self.environment.clone();
         self.environment = environment;
 
@@ -300,8 +286,8 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 {
     fn visit_block(&mut self, block: &Block) -> Result<(), Unwinder> {
         let new_env = Environment::new(Some(self.environment.clone()));
-        self.executeBlock(&block.statements,
-                          new_env)?;
+        self.execute_block(&block.statements,
+                           new_env)?;
         Ok(())
     }
 
