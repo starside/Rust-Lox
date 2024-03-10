@@ -68,7 +68,7 @@ impl quote::ToTokens for ExprEnum {
         let name = self.name.clone();
         let idn = format_ident!("{}", name);
         let gen = quote! {
-            #idn(Box<#idn>),
+            #idn(Pin<Box<#idn>>),
         };
         gen.to_tokens(tokens);
     }

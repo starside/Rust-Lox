@@ -83,6 +83,7 @@ pub mod ast {
     type VarName = String;
 
     pub mod expression{
+        use std::pin::Pin;
         use crate::lox::{Token};
         use super::{LiteralValue, VarName};
         use lox_derive_ast::derive_ast;
@@ -106,6 +107,7 @@ pub mod ast {
         use lox_derive_ast::derive_ast;
         use crate::lox::ast::{expression};
         use crate::lox::Token;
+        use std::pin::Pin;
 
         type Expr = expression::Expr;
 
@@ -123,7 +125,7 @@ pub mod ast {
 
         pub(crate) type StmtList = Vec<Stmt>;
         type TokenList = Vec<Token>;
-        pub type FuncBody = Rc<Box<Stmt>>; // Can I eliminate this with lifetimes?
+        pub type FuncBody = Rc<Pin<Box<Stmt>>>; // Can I eliminate this with lifetimes?
     }
 }
 

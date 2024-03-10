@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::rc::Rc;
 use crate::lox::ast::LiteralValue;
 use crate::lox::{ast, Token, TokenKind, TokenType};
@@ -103,7 +104,7 @@ impl<'a> Parser<'a> {
             let right = self.term()?;
             left =
                 Expr::Binary(
-                    Box::new(Binary{left: left, operator, right: right})
+                    Pin::new(Box::new(Binary{left: left, operator, right: right}))
                 );
         }
 
@@ -123,7 +124,7 @@ impl<'a> Parser<'a> {
                 }
             };
             return Ok(Expr::Assign(
-                Box::new(ast::expression::Assign{
+                Box::pin(ast::expression::Assign{
                     name: expr,
                     value})
             ));
@@ -138,7 +139,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.and()?;
             expr = Expr::Logical(
-                Box::new(
+                Box::pin(
                     ast::expression::Logical {
                         left: expr,
                         operator,
@@ -156,7 +157,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.equality()?;
             expr = Expr::Logical(
-                Box::new(
+                Box::pin(
                     ast::expression::Logical {
                         left: expr,
                         operator,
@@ -176,7 +177,7 @@ impl<'a> Parser<'a> {
             let right = self.comparison()?;
             left =
                 Expr::Binary(
-                    Box::new(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left: left, operator, right: right})
                 );
         }
 
@@ -197,7 +198,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.factor()?;
             left = Expr::Binary(
-                    Box::new(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left: left, operator, right: right})
                 );
         }
 
@@ -213,7 +214,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             left = Expr::Binary(
-                    Box::new(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left: left, operator, right: right})
                 );
         }
 
@@ -237,7 +238,7 @@ impl<'a> Parser<'a> {
         let paren = self.consume(TokenKind::RightParen, "Expect ')' after arguments.".to_string())?;
         Ok(
             Expr::Call(
-                Box::new(Call{
+                Box::pin(Call{
                     callee,
                     paren,
                     arguments
@@ -266,7 +267,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary(
-                    Box::new(Unary{operator, right: right})
+                    Box::pin(Unary{operator, right: right})
                 )
             );
         }
@@ -275,15 +276,15 @@ impl<'a> Parser<'a> {
 
     fn primary(&mut self) -> ParserResult {
         if self.match_token(&[TokenKind::False]) {
-            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(false)})));
+            return Ok(Expr::Literal(Box::pin(ast::expression::Literal{value: LiteralValue::Boolean(false)})));
         }
 
         if self.match_token(&[TokenKind::True]) {
-            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)})));
+            return Ok(Expr::Literal(Box::pin(ast::expression::Literal{value: LiteralValue::Boolean(true)})));
         }
 
         if self.match_token(&[TokenKind::Nil]) {
-            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Nil})));
+            return Ok(Expr::Literal(Box::pin(ast::expression::Literal{value: LiteralValue::Nil})));
         }
 
         if self.match_token(
@@ -294,21 +295,21 @@ impl<'a> Parser<'a> {
                 TokenType::Number(x) => LiteralValue::Number(*x),
                 _ => panic!("Error")
             };
-            return Ok(Expr::Literal(Box::new(ast::expression::Literal{value})));
+            return Ok(Expr::Literal(Box::pin(ast::expression::Literal{value})));
         }
 
         if self.match_token(
             &[TokenKind::Identifier]) {
             let previous = &self.previous().token_type;
             if let TokenType::Identifier(x) = previous {
-                return Ok(Expr::Variable(Box::new(ast::expression::Variable{name: x.clone()})));
+                return Ok(Expr::Variable(Box::pin(ast::expression::Variable{name: x.clone()})));
             };
         }
 
         if self.match_token(&[TokenKind::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenKind::RightParen, "Expected )".to_string())?;
-            return Ok(Expr::Grouping(Box::new(ast::expression::Grouping{expression: expr})));
+            return Ok(Expr::Grouping(Box::pin(ast::expression::Grouping{expression: expr})));
         }
 
         Err(self.error(self.peek(), "Expected expression".to_string()))
@@ -325,7 +326,7 @@ impl<'a> Parser<'a> {
         let body = self.statement()?;
         Ok(
             Stmt::While(
-                Box::new(
+                Box::pin(
                     ast::statement::While {
                         condition,
                         body
@@ -359,7 +360,7 @@ impl<'a> Parser<'a> {
         let increment = if !self.check(&[TokenKind::RightParen]) {
             Some(
                 Stmt::Expression(
-                    Box::new(
+                    Box::pin(
                         Expression {
                             expression: self.expression()?
                         }
@@ -387,7 +388,7 @@ impl<'a> Parser<'a> {
         let condition = if let Some(x) = condition {
             x
         } else {
-            Expr::Literal(Box::new(ast::expression::Literal{value: LiteralValue::Boolean(true)}))
+            Expr::Literal(Box::pin(ast::expression::Literal{value: LiteralValue::Boolean(true)}))
         };
 
         // Build while body.  First for_body, followed by optional increment
@@ -398,7 +399,7 @@ impl<'a> Parser<'a> {
         }
 
         let while_body = Stmt::Block(
-            Box::new(
+            Box::pin(
                 ast::statement::Block {
                     statements: while_body
                 }
@@ -406,7 +407,7 @@ impl<'a> Parser<'a> {
         );
 
         let while_loop = Stmt::While(
-            Box::new(
+            Box::pin(
                 ast::statement::While {
                     condition,
                     body: while_body
@@ -423,7 +424,7 @@ impl<'a> Parser<'a> {
 
         Ok(
             Stmt::Block(
-                Box::new(
+                Box::pin(
                     ast::statement::Block {
                         statements
                     }
@@ -447,7 +448,7 @@ impl<'a> Parser<'a> {
 
         Ok(
             Stmt::If(
-                Box::new(
+                Box::pin(
                     ast::statement::If {
                         condition,
                         then_branch,
@@ -505,11 +506,11 @@ impl<'a> Parser<'a> {
         let body = self.block()?;
         Ok(
             Stmt::Function(
-                Box::new(
+                Box::pin(
                     ast::statement::Function {
                         name,
                         params,
-                        body: Rc::new(Box::new(body)) // Damn, I need to figure out lifetimes
+                        body: Rc::new(Box::pin(body)) // Damn, I need to figure out lifetimes
                     }
                 )
             )
@@ -546,7 +547,7 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::Semicolon, "Expect ';' after variable declaration.".to_string())?;
         let new_id = if let TokenType::Identifier(x) = name.token_type
         {
-            Box::new(Var {name: x, initializer})
+            Box::pin(Var {name: x, initializer})
         } else {
             panic!("Logic error!")
         };
@@ -585,14 +586,14 @@ impl<'a> Parser<'a> {
         let value = if !self.check(&[TokenKind::Semicolon]) {
             self.expression()?
         } else {
-            Expr::Literal(Box::new(Literal{value: LiteralValue::Nil}))
+            Expr::Literal(Box::pin(Literal{value: LiteralValue::Nil}))
         };
 
         self.consume(TokenKind::Semicolon, "Expect ';' after return value".to_string())?;
 
         Ok(
             Stmt::Return(
-                Box::new(ast::statement::Return{
+                Box::pin(ast::statement::Return{
                     keyword,
                     value
                 })
@@ -607,7 +608,7 @@ impl<'a> Parser<'a> {
         }
         self.consume(TokenKind::RightBrace, "Expect '}' after block.".to_string())?;
         Ok(
-            Stmt::Block(Box::new(ast::statement::Block { statements }))
+            Stmt::Block(Box::pin(ast::statement::Block { statements }))
         )
     }
 
@@ -616,7 +617,7 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::Semicolon, "Expected ; after value".to_string())?;
         let new_print = Print{expression: value};
         Ok(
-            Stmt::Print(Box::new(new_print))
+            Stmt::Print(Box::pin(new_print))
         )
     }
 
@@ -624,7 +625,7 @@ impl<'a> Parser<'a> {
         let value = self.expression()?;
         self.consume(TokenKind::Semicolon, "Expected ; after expression".to_string())?;
         Ok(
-            Stmt::Expression(Box::new(
+            Stmt::Expression(Box::pin(
                 Expression{expression: value}
             )
             )

@@ -4,6 +4,7 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::time::{Instant};
 
@@ -112,8 +113,8 @@ impl Callable for LoxFunction {
 
         //
         let binding = self.body.clone();
-        let a = binding.as_ref();
-        let run_result = if let Stmt::Block(x) = a.as_ref() {
+        let a = binding.deref();
+        let run_result = if let Stmt::Block(x) = a.deref() {
             interpreter.execute_block(&x.statements, environment)
         } else {
             Err(
