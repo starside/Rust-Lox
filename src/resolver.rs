@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::panic::panic_any;
 use std::thread::scope;
+use log::log;
 use crate::interpreter::Interpreter;
 use crate::lox;
 use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
@@ -95,28 +96,38 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         Ok(())
     }
 
-    fn visit_binary(&mut self, visitor: &Binary) -> Result<(), String> {
-        todo!()
+    fn visit_binary(&mut self, binary: &Binary) -> Result<(), String> {
+        self.resolve_expression(&binary.left)?;
+        self.resolve_expression(&binary.right)?;
+        Ok(())
     }
 
-    fn visit_call(&mut self, visitor: &Call) -> Result<(), String> {
-        todo!()
+    fn visit_call(&mut self, call: &Call) -> Result<(), String> {
+        self.resolve_expression(&call.callee)?;
+        for arg in call.arguments.iter() {
+            self.resolve_expression(arg)?;
+        }
+        Ok(())
     }
 
-    fn visit_grouping(&mut self, visitor: &Grouping) -> Result<(), String> {
-        todo!()
+    fn visit_grouping(&mut self, paren: &Grouping) -> Result<(), String> {
+        self.resolve_expression(&paren.expression)?;
+        Ok(())
     }
 
-    fn visit_literal(&mut self, visitor: &Literal) -> Result<(), String> {
-        todo!()
+    fn visit_literal(&mut self, _: &Literal) -> Result<(), String> {
+        Ok(())
     }
 
-    fn visit_logical(&mut self, visitor: &Logical) -> Result<(), String> {
-        todo!()
+    fn visit_logical(&mut self, logical: &Logical) -> Result<(), String> {
+        self.resolve_expression(&logical.left)?;
+        self.resolve_expression(&logical.right)?;
+        Ok(())
     }
 
-    fn visit_unary(&mut self, visitor: &Unary) -> Result<(), String> {
-        todo!()
+    fn visit_unary(&mut self, unary: &Unary) -> Result<(), String> {
+        self.resolve_expression(&unary.right)?;
+        Ok(())
     }
 
     fn visit_variable(&mut self, var: &Variable) -> Result<(), String> {
@@ -144,8 +155,9 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_expression(&mut self, visitor: &Expression) -> Result<(), String> {
-        todo!()
+    fn visit_expression(&mut self, expr: &Expression) -> Result<(), String> {
+        self.resolve_expression(&expr.expression)?;
+        Ok(())
     }
 
     fn visit_function(&mut self, stmt: &Function) -> Result<(), String> {
@@ -160,16 +172,27 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_if(&mut self, visitor: &If) -> Result<(), String> {
-        todo!()
+    fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
+        self.resolve_expression(&ifstmt.condition)?;
+        self.resolve_statement(&ifstmt.then_branch)?;
+        if let Stmt::Empty = ifstmt.else_branch {}
+        else {
+            self.resolve_statement(&ifstmt.else_branch)?;
+        }
+        Ok(())
     }
 
-    fn visit_print(&mut self, visitor: &Print) -> Result<(), String> {
-        todo!()
+    fn visit_print(&mut self, stmt: &Print) -> Result<(), String> {
+        self.resolve_expression(&stmt.expression)?;
+        Ok(())
     }
 
-    fn visit_return(&mut self, visitor: &Return) -> Result<(), String> {
-        todo!()
+    fn visit_return(&mut self, stmt: &Return) -> Result<(), String> {
+        if let Expr::Empty = stmt.value {}
+        else {
+            self.resolve_expression(&stmt.value)?;
+        }
+        Ok(())
     }
 
     fn visit_var(&mut self, var: &Var) -> Result<(), String> {
@@ -183,7 +206,9 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_while(&mut self, visitor: &While) -> Result<(), String> {
-        todo!()
+    fn visit_while(&mut self, stmt: &While) -> Result<(), String> {
+        self.resolve_expression(&stmt.condition)?;
+        self.resolve_statement(&stmt.body)?;
+        Ok(())
     }
 }
