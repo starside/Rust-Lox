@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Grouping, Literal, Logical, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -87,54 +87,6 @@ struct LoxFunction {
     params: Vec<String>,
     body: ast::statement::FuncBody,
     closure: EnvironmentRef
-}
-
-struct DebugStatements;
-impl StmtVisitor<()> for DebugStatements {
-    fn visit_block(&mut self, visitor: &Block) -> () {
-        println!("#### Block;");
-        let mut i: usize = 0;
-        while i < visitor.statements.len(){
-            println!("Stmt {}: ", i);
-            visitor.statements[i].accept(self);
-            i += 1;
-        }
-    }
-
-    fn visit_expression(&mut self, visitor: &Expression) -> () {
-        println!("#### Expression;");
-    }
-
-    fn visit_function(&mut self, visitor: &Function) -> () {
-        println!("#### Function body:");
-        visitor.body.accept(self);
-    }
-
-    fn visit_if(&mut self, visitor: &If) -> () {
-        println!("{{<If>");
-        println!("#### If then branch;");
-        visitor.then_branch.accept(self);
-        println!("#### If else branch;");
-        visitor.else_branch.accept(self);
-        println!("}}If");
-    }
-
-    fn visit_print(&mut self, visitor: &Print) -> () {
-        println!("#### Print;");
-    }
-
-    fn visit_return(&mut self, visitor: &Return) -> () {
-        println!("#### Return;");
-    }
-
-    fn visit_var(&mut self, visitor: &Var) -> () {
-        println!("#### Var {} ;", visitor.name);
-    }
-
-    fn visit_while(&mut self, visitor: &While) -> () {
-        println!("#### While body;");
-        visitor.body.accept(self);
-    }
 }
 
 impl LoxFunction {
@@ -441,7 +393,12 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 impl AstVisitor<RunValue> for Interpreter {
     fn visit_assign(&mut self, expr: &Assign) -> RunValue {
         let value = expr.value.accept(self)?;
-        self.environment.borrow_mut().assign(&expr.name, &value)?;
+        let name = if let Expr::Variable(name) = &expr.name {
+            &name.name
+        } else {
+            panic!("Parser fucked up");
+        };
+        self.environment.borrow_mut().assign(name, &value)?;
         return Ok(value);
     }
 

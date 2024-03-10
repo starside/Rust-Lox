@@ -10,6 +10,7 @@ use crate::parser::Parser;
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
+use crate::resolver::Resolver;
 
 #[derive(Clone, Debug)]
 pub struct Token {
@@ -88,7 +89,7 @@ pub mod ast {
 
         derive_ast!(
             Ast/Expr/
-            Assign: VarName name, Expr value;
+            Assign: Expr name, Expr value;
             Binary : Expr left, Token operator, Expr right;
             Call: Expr callee, Token paren, ExprList arguments;
             Grouping : Expr expression;
@@ -135,6 +136,7 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
             match parser.parse() {
                 Ok(statements) => {
                     let mut interpreter = Interpreter::new();
+                    let resolver: Resolver = Resolver::new(&mut interpreter);
                     for s in statements {
                         if let Err(unwind) = s.accept(&mut interpreter) {
                             match unwind {

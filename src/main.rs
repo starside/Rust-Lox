@@ -2,6 +2,7 @@ mod lox;
 mod scanner;
 mod parser;
 mod interpreter;
+mod resolver;
 
 use std::error::Error;
 use crate::lox::{run_prompt, run_file};

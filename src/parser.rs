@@ -116,17 +116,17 @@ impl<'a> Parser<'a> {
         if  is_equal {
             let equals = self.previous().clone();
             let value = self.assignment()?;
-            let r = match &expr {
-                Expr::Variable(x) => {
-                    Ok(Expr::Assign(
-                        Box::new(ast::expression::Assign{name: x.name.clone(), value})
-                    ))
-                }
+            match &expr {
+                Expr::Variable(_) => {}
                 _ => {
-                    Err(self.error(&equals, "Invalid target assignment".to_string()))
+                    return Err(self.error(&equals, "Invalid target assignment".to_string()));
                 }
             };
-            return r;
+            return Ok(Expr::Assign(
+                Box::new(ast::expression::Assign{
+                    name: expr,
+                    value})
+            ));
         }
 
         Ok(expr)
