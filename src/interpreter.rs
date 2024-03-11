@@ -120,7 +120,7 @@ impl Callable for LoxFunction {
         let binding = self.body.clone();
         let a = binding.deref();
         let run_result = if let Stmt::Block(x) = a.deref() {
-            interpreter.execute_block(&x.statements, environment)
+            interpreter.execute_block(&x.statements, Environment::new(Some(environment)))
         } else {
             Err(
                 Unwinder::RuntimeError("Somehow not executing a block.  This is a bug".to_string())
@@ -210,14 +210,16 @@ impl Environment {
             current_env = env.borrow().enclosing.clone();
         }
 
-        Err(format!("Variable  {} is not found", &name).to_string())
+        Err(format!("Variable {} is not found", &name).to_string())
     }
 
     fn ancestor(&self, distance:usize) ->Option<EnvironmentRef> {
         assert_ne!(distance, 0);
+        println!("D=0 {:?}", self.values.keys());
         let mut current_env = self.enclosing.clone();
 
-        for _ in 1..distance{
+        for i in 1..distance{
+            println!("D={} {:?}", i, current_env.as_ref().unwrap().borrow().values.keys());
             if let Some(env) = current_env {
                 current_env = env.borrow().enclosing.clone();
             } else {
@@ -230,6 +232,7 @@ impl Environment {
     fn get_at(
         &self,
         distance: usize, name: &String) -> Result<EvalValue, String> {
+        println!("get_at: distance {}, {}", distance, name);
 
         if distance == 0 {
             // Check current scope
@@ -242,6 +245,9 @@ impl Environment {
             if let Some(val) = self.ancestor(distance) {
                 if let Some(t) = val.borrow().values.get(name) {
                     return Ok(t.clone());
+                }
+                else {
+                    panic!("Variable not found")
                 }
             }
         }
@@ -287,11 +293,15 @@ impl<'a> Interpreter {
     }
 
     pub fn resolve(&mut self, expr: ExprId, depth: usize) {
+        println!("Inserting exprid {} at depth {}", expr, depth);
         self.locals.insert(expr, depth);
     }
 
     fn lookup_variable(&self, name: &String, expr_id: ExprId) -> Result<EvalValue, String> {
+        println!("lookup_variable {} with exprid {}", name, expr_id);
+        println!("{:?}", self.locals);
         if let Some(distance) = self.locals.get(&expr_id) {
+            println!("Variable {} is at distance {}", name, distance);
             self.environment.borrow().get_at(*distance, name)
         } else {
             self.globals.borrow().get(name)
@@ -452,7 +462,7 @@ impl AstVisitor<RunValue> for Interpreter {
             panic!("Parser fucked up");
         };
 
-        let exprid = addr_of!(expr) as ExprId;
+        let exprid = addr_of!(*expr) as ExprId;
         if let Some(distance) = self.locals.get(&exprid) {
             self.environment.borrow_mut().assign_at(*distance, name, &value);
         } else {
@@ -593,7 +603,7 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
-        let e: ExprId = addr_of!(varname) as ExprId;
+        let e: ExprId = addr_of!(*varname) as ExprId;
         let v = self.lookup_variable(&varname.name, e)?;
         Ok(v)
     }

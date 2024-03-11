@@ -40,6 +40,7 @@ impl<'i> Resolver<'i> {
 
     fn resolve_function(&mut self, function: &Function) -> Result<(), String> {
         self.begin_scope();
+        println!("Created function scope {}", self.scopes.len() - 1);
         for param in function.params.iter() {
             if let TokenType::Identifier(pn) = &param.token_type {
                 self.declare(pn);
@@ -49,33 +50,39 @@ impl<'i> Resolver<'i> {
             }
         }
         self.resolve_statement(&function.body)?;
+        println!("Ended function scope {}", self.scopes.len() - 1);
         self.end_scope();
         Ok(())
     }
 
-    fn resolve_local(&mut self, expr: &Expr, name: &str) {
+    fn resolve_local(&mut self, exprid: ExprId, name: &str) {
+        println!("resolve local for {} with {}, number of scopes {}", name, exprid, self.scopes.len());
         let idx = (0..self.scopes.len()).rev();
         for (i, scope) in idx.zip(self.scopes.iter()) {
             if scope.contains_key(name) {
-                self.interpreter.resolve(addr_of!(expr) as ExprId, i);
+                self.interpreter.resolve(exprid, i);
                 return;
             }
         }
     }
 
     fn declare(&mut self, name: &str) {
+        let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
-
+            println!("Declaring \"{}\" in scope {}", name, len - 1);
             scope.insert(String::from(name), false);
         }
     }
 
     fn define(&mut self, name: &str) {
+        let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
+            println!("Defining \"{}\" in scope {}", name, len - 1);
             if let Some(value) = scope.get_mut(name) {
                 *value = true;
             }
             else {
+                //scope.insert(name.to_string(), true);
                 panic!("Resolver cannot define an undeclared variable");
             }
         }
@@ -90,7 +97,7 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         } else {
             panic!("Parser fucked up");
         };
-        self.resolve_local(&assign.value, name);
+        self.resolve_local(addr_of!(*assign) as ExprId, name);
         Ok(())
     }
 
@@ -130,25 +137,29 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
 
     fn visit_variable(&mut self, var: &Variable) -> Result<(), String> {
         let name = &var.name;
+        let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
+            println!("Visiting variable {}, looking in scope {}", name, len - 1);
             if let Some(value) = scope.get(name) {
                 if *value == false {
                     // TODO:  Lost line information
                     return Err("Can't read local variable in its own initializer.".to_string());
                 }
             }
-            else {
+            /*else {
                 panic!("Bug:  Resolver did not find variable")
-            }
+            }*/
         }
-        //self.resolve_local(var, name);
+        self.resolve_local(addr_of!(*var) as ExprId, name);
         Ok(())
     }
 }
 impl StmtVisitor<Result<(), String>> for Resolver<'_> {
     fn visit_block(&mut self, block: &Block) -> Result<(), String> {
         self.begin_scope();
+        println!("Block created scope {}", self.scopes.len() - 1);
         self.resolve_statement_list(&block.statements)?;
+        println!("Block ended scope {}", self.scopes.len() - 1);
         self.end_scope();
         Ok(())
     }
