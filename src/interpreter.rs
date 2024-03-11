@@ -5,6 +5,7 @@ use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::ptr::addr_of;
 use std::rc::Rc;
 use std::time::{Instant};
 
@@ -211,6 +212,52 @@ impl Environment {
 
         Err(format!("Variable  {} is not found", &name).to_string())
     }
+
+    fn ancestor(&self, distance:usize) ->Option<EnvironmentRef> {
+        assert_ne!(distance, 0);
+        let mut current_env = self.enclosing.clone();
+
+        for _ in 1..distance{
+            if let Some(env) = current_env {
+                current_env = env.borrow().enclosing.clone();
+            } else {
+                panic!("Parser fucked up");
+            }
+        }
+
+        current_env
+    }
+    fn get_at(
+        &self,
+        distance: usize, name: &String) -> Result<EvalValue, String> {
+
+        if distance == 0 {
+            // Check current scope
+            if let Some(val) = self.values.get(name) {
+                return Ok(val.clone());
+            }
+        }
+        else {
+            // Search enclosing scopes
+            if let Some(val) = self.ancestor(distance) {
+                if let Some(t) = val.borrow().values.get(name) {
+                    return Ok(t.clone());
+                }
+            }
+        }
+
+        Err(format!("Variable  {} is not found", &name).to_string())
+    }
+
+    fn assign_at(&mut self, distance: usize, name: &str, value: &EvalValue) {
+        if distance == 0 {
+            self.values.insert(name.to_string(), value.clone());
+        }
+        else {
+            let a = self.ancestor(distance).expect("Parser fucked up");
+            a.borrow_mut().values.insert(name.to_string(), value.clone());
+        }
+    }
 }
 
 impl From<String> for Unwinder {
@@ -221,6 +268,7 @@ impl From<String> for Unwinder {
 
 pub struct Interpreter {
     environment: EnvironmentRef,
+    globals: EnvironmentRef,
     boot_time: Instant,
     locals: HashMap<ExprId, usize>
 }
@@ -235,11 +283,19 @@ impl<'a> Interpreter {
                 Rc::new(Box::new(BuiltinFunctionTime))
             ));
         }
-        Interpreter{environment: global_env, boot_time: Instant::now(), locals}
+        Interpreter{environment: global_env.clone(), globals: global_env, boot_time: Instant::now(), locals}
     }
 
     pub fn resolve(&mut self, expr: ExprId, depth: usize) {
         self.locals.insert(expr, depth);
+    }
+
+    fn lookup_variable(&self, name: &String, expr_id: ExprId) -> Result<EvalValue, String> {
+        if let Some(distance) = self.locals.get(&expr_id) {
+            self.environment.borrow().get_at(*distance, name)
+        } else {
+            self.globals.borrow().get(name)
+        }
     }
 }
 
@@ -395,7 +451,14 @@ impl AstVisitor<RunValue> for Interpreter {
         } else {
             panic!("Parser fucked up");
         };
-        self.environment.borrow_mut().assign(name, &value)?;
+
+        let exprid = addr_of!(expr) as ExprId;
+        if let Some(distance) = self.locals.get(&exprid) {
+            self.environment.borrow_mut().assign_at(*distance, name, &value);
+        } else {
+            self.globals.borrow_mut().assign(name, &value)?;
+        }
+
         return Ok(value);
     }
 
@@ -530,7 +593,8 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
-        let res = self.environment.borrow().get(&varname.name);
-        Ok(res?)
+        let e: ExprId = addr_of!(varname) as ExprId;
+        let v = self.lookup_variable(&varname.name, e)?;
+        Ok(v)
     }
 }

@@ -31,7 +31,7 @@ impl<'i> Resolver<'i> {
         expr.accept(self)
     }
 
-    fn resolve_statement_list(&mut self, statements: &StmtList) -> Result<(), String> {
+    pub fn resolve_statement_list(&mut self, statements: &StmtList) -> Result<(), String> {
         for statement in statements.iter() {
             self.resolve_statement(statement)?;
         }
@@ -65,6 +65,7 @@ impl<'i> Resolver<'i> {
 
     fn declare(&mut self, name: &str) {
         if let Some(scope) = self.scopes.last_mut() {
+
             scope.insert(String::from(name), false);
         }
     }

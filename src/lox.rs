@@ -138,7 +138,13 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
             match parser.parse() {
                 Ok(statements) => {
                     let mut interpreter = Interpreter::new();
-                    let resolver: Resolver = Resolver::new(&mut interpreter);
+                    let mut resolver: Resolver = Resolver::new(&mut interpreter);
+                    match resolver.resolve_statement_list(&statements) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(Box::from(e));
+                        }
+                    }
                     for s in statements {
                         if let Err(unwind) = s.accept(&mut interpreter) {
                             match unwind {
