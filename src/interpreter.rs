@@ -215,11 +215,9 @@ impl Environment {
 
     fn ancestor(&self, distance:usize) ->Option<EnvironmentRef> {
         assert_ne!(distance, 0);
-        println!("D=0 {:?}", self.values.keys());
         let mut current_env = self.enclosing.clone();
 
         for i in 1..distance{
-            println!("D={} {:?}", i, current_env.as_ref().unwrap().borrow().values.keys());
             if let Some(env) = current_env {
                 current_env = env.borrow().enclosing.clone();
             } else {
@@ -232,7 +230,6 @@ impl Environment {
     fn get_at(
         &self,
         distance: usize, name: &String) -> Result<EvalValue, String> {
-        println!("get_at: distance {}, {}", distance, name);
 
         if distance == 0 {
             // Check current scope
@@ -293,15 +290,11 @@ impl<'a> Interpreter {
     }
 
     pub fn resolve(&mut self, expr: ExprId, depth: usize) {
-        println!("Inserting exprid {} at depth {}", expr, depth);
         self.locals.insert(expr, depth);
     }
 
     fn lookup_variable(&self, name: &String, expr_id: ExprId) -> Result<EvalValue, String> {
-        println!("lookup_variable {} with exprid {}", name, expr_id);
-        println!("{:?}", self.locals);
         if let Some(distance) = self.locals.get(&expr_id) {
-            println!("Variable {} is at distance {}", name, distance);
             self.environment.borrow().get_at(*distance, name)
         } else {
             self.globals.borrow().get(name)

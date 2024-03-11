@@ -40,7 +40,6 @@ impl<'i> Resolver<'i> {
 
     fn resolve_function(&mut self, function: &Function) -> Result<(), String> {
         self.begin_scope();
-        println!("Created function scope {}", self.scopes.len() - 1);
         for param in function.params.iter() {
             if let TokenType::Identifier(pn) = &param.token_type {
                 self.declare(pn);
@@ -50,13 +49,11 @@ impl<'i> Resolver<'i> {
             }
         }
         self.resolve_statement(&function.body)?;
-        println!("Ended function scope {}", self.scopes.len() - 1);
         self.end_scope();
         Ok(())
     }
 
     fn resolve_local(&mut self, exprid: ExprId, name: &str) {
-        println!("resolve local for {} with {}, number of scopes {}", name, exprid, self.scopes.len());
         let idx = (0..self.scopes.len()).rev();
         for (i, scope) in idx.zip(self.scopes.iter()) {
             if scope.contains_key(name) {
@@ -69,7 +66,6 @@ impl<'i> Resolver<'i> {
     fn declare(&mut self, name: &str) {
         let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
-            println!("Declaring \"{}\" in scope {}", name, len - 1);
             scope.insert(String::from(name), false);
         }
     }
@@ -77,7 +73,6 @@ impl<'i> Resolver<'i> {
     fn define(&mut self, name: &str) {
         let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
-            println!("Defining \"{}\" in scope {}", name, len - 1);
             if let Some(value) = scope.get_mut(name) {
                 *value = true;
             }
@@ -139,7 +134,6 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         let name = &var.name;
         let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
-            println!("Visiting variable {}, looking in scope {}", name, len - 1);
             if let Some(value) = scope.get(name) {
                 if *value == false {
                     // TODO:  Lost line information
@@ -157,9 +151,7 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
 impl StmtVisitor<Result<(), String>> for Resolver<'_> {
     fn visit_block(&mut self, block: &Block) -> Result<(), String> {
         self.begin_scope();
-        println!("Block created scope {}", self.scopes.len() - 1);
         self.resolve_statement_list(&block.statements)?;
-        println!("Block ended scope {}", self.scopes.len() - 1);
         self.end_scope();
         Ok(())
     }
