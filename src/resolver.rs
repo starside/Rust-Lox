@@ -5,14 +5,21 @@ use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Bina
 use crate::lox::ast::statement::{Accept, Block, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{TokenType};
 
+#[derive(Copy, Clone, PartialEq)]
+enum FunctionType {
+    None,
+    Function
+}
+
 pub struct Resolver<'i> {
     interpreter: &'i mut Interpreter,
-    scopes: Vec<HashMap<String, bool>>
+    scopes: Vec<HashMap<String, bool>>,
+    current_function: FunctionType
 }
 
 impl<'i> Resolver<'i> {
     pub fn new(interpreter: &'i mut Interpreter) -> Self {
-        Resolver{interpreter, scopes: Vec::new()}
+        Resolver{interpreter, scopes: Vec::new(), current_function: FunctionType::None}
     }
 
     fn begin_scope(&mut self) {
@@ -38,11 +45,13 @@ impl<'i> Resolver<'i> {
         Ok(())
     }
 
-    fn resolve_function(&mut self, function: &Function) -> Result<(), String> {
+    fn resolve_function(&mut self, function: &Function, function_type: FunctionType) -> Result<(), String> {
+        let enclosing_function= self.current_function;
+        self.current_function = function_type;
         self.begin_scope();
         for param in function.params.iter() {
             if let TokenType::Identifier(pn) = &param.token_type {
-                self.declare(pn);
+                self.declare(pn)?;
                 self.define(pn);
             } else {
                 panic!("Parser fucked up");
@@ -50,6 +59,7 @@ impl<'i> Resolver<'i> {
         }
         self.resolve_statement(&function.body)?;
         self.end_scope();
+        self.current_function = enclosing_function;
         Ok(())
     }
 
@@ -63,15 +73,16 @@ impl<'i> Resolver<'i> {
         }
     }
 
-    fn declare(&mut self, name: &str) {
-        let len = self.scopes.len();
+    fn declare(&mut self, name: &str) -> Result<(), String> {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(String::from(name), false);
+            if scope.insert(String::from(name), false).is_some() {
+                return Err("Already a variable with this name in this scope.".to_string());
+            }
         }
+        Ok(())
     }
 
     fn define(&mut self, name: &str) {
-        let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
             if let Some(value) = scope.get_mut(name) {
                 *value = true;
@@ -132,7 +143,6 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
 
     fn visit_variable(&mut self, var: &Variable) -> Result<(), String> {
         let name = &var.name;
-        let len = self.scopes.len();
         if let Some(scope) = self.scopes.last_mut() {
             if let Some(value) = scope.get(name) {
                 if *value == false {
@@ -140,9 +150,6 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
                     return Err("Can't read local variable in its own initializer.".to_string());
                 }
             }
-            /*else {
-                panic!("Bug:  Resolver did not find variable")
-            }*/
         }
         self.resolve_local(addr_of!(*var) as ExprId, name);
         Ok(())
@@ -167,9 +174,9 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         } else {
             panic!("Parser fucked up")
         };
-        self.declare(name);
+        self.declare(name)?;
         self.define(name);
-        self.resolve_function(stmt)?;
+        self.resolve_function(stmt, FunctionType::Function)?;
         Ok(())
     }
 
@@ -189,6 +196,9 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
     }
 
     fn visit_return(&mut self, stmt: &Return) -> Result<(), String> {
+        if self.current_function == FunctionType::None {
+            return Err("Can't return from top-level code.".to_string());
+        }
         if let Expr::Empty = stmt.value {}
         else {
             self.resolve_expression(&stmt.value)?;
@@ -198,7 +208,7 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
 
     fn visit_var(&mut self, var: &Var) -> Result<(), String> {
         let name = var.name.as_str();
-        self.declare(name);
+        self.declare(name)?;
         if let Expr::Empty = var.initializer {}
         else {
             self.resolve_expression(&var.initializer)?;

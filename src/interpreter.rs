@@ -217,7 +217,7 @@ impl Environment {
         assert_ne!(distance, 0);
         let mut current_env = self.enclosing.clone();
 
-        for i in 1..distance{
+        for _ in 1..distance{
             if let Some(env) = current_env {
                 current_env = env.borrow().enclosing.clone();
             } else {
