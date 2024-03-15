@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
         if !self.check(&[TokenKind::RightParen]) {
             loop {
                 if arguments.len() >= 255 {
-                    return Err(self.error(self.peek(), "Cant have more than 255 arguments.".to_string()));
+                    return Err(self.error(self.peek(), "Can't have more than 255 arguments.".to_string()));
                 }
                 arguments.push(self.expression()?);
                 if !self.match_token(&[TokenKind::Comma]) {
@@ -504,7 +504,7 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(TokenKind::RightParen,
-                                 "Expect ')' after parameter list".to_string())?;
+                                 "Expect ')' after parameters.".to_string())?;
 
 
         self.consume(TokenKind::LeftBrace, "Expect '{' before function body.".to_string())?;
