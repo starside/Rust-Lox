@@ -5,7 +5,7 @@ mod interpreter;
 mod resolver;
 
 use std::error::Error;
-use crate::lox::{run_prompt, run_file};
+use crate::lox::{run_prompt, run_file, RunErrorType};
 use clap;
 use clap::Parser;
 
@@ -14,19 +14,48 @@ struct CommandLine {
     script: Option<std::path::PathBuf>
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = CommandLine::parse();
+type ErrorCode = i32;
 
-    if let Some(path) = args.script {
-        match run_file(path) {
-            Ok(_) => {}
-            Err(_) => {
-                std::process::exit(70);
+fn process_status_code(status: Result<(), RunErrorType>) {
+    match status {
+        Ok(_) => {}
+        Err(x) => {
+            match x {
+                RunErrorType::Scanner => {
+                    std::process::exit(65);
+                }
+                RunErrorType::Parser(msgs) => {
+                    for err in msgs {
+                        let (t, b) = err;
+                        eprintln!("[line {}] {}", t.line, b);
+                    }
+                    std::process::exit(65);
+                }
+                RunErrorType::Resolver(msg) => {
+                    eprintln!("{}", msg);
+                    std::process::exit(70);
+                }
+                RunErrorType::Interpreter(msg) => {
+                    eprintln!("{}", msg);
+                    std::process::exit(70);
+                }
+                RunErrorType::IOError(msg) => {
+                    eprintln!("{}", msg);
+                    std::process::exit(70);
+                }
             }
         }
     }
-    else {
-        run_prompt()?;
+}
+
+fn main() {
+    let args = CommandLine::parse();
+
+    let status = if let Some(path) = args.script {
+        run_file(path)
     }
-    Ok(())
+    else {
+        run_prompt()
+    };
+    process_status_code(status);
 }

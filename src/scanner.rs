@@ -59,7 +59,8 @@ impl<'s> Scanner<'s> {
             self.scan_token();
         }
         self.add_token(self.new_token(
-            TokenType::Eof
+            TokenType::Eof,
+            "".to_string()
         ));
 
         if self.errors.is_empty() {
@@ -75,27 +76,29 @@ impl<'s> Scanner<'s> {
     }
 
     // Abbreviated for New Token Meta Data
-    fn new_token(&self, token_type: TokenType) -> Token {
+    fn new_token(&self, token_type: TokenType, lexeme: String) -> Token {
         Token {
             line: self.line,
-            token_type
+            token_type,
+            lexeme
         }
     }
 
     fn scan_token(&mut self) {
         let c = self.advance();
+        let c_str = c.to_string();
         match c {
             // Single character tokens
-            '(' => self.add_token(self.new_token(TokenType::LeftParen)),
-            ')' => self.add_token(self.new_token(TokenType::RightParen)),
-            '{' => self.add_token(self.new_token(TokenType::LeftBrace)),
-            '}' => self.add_token(self.new_token(TokenType::RightBrace)),
-            ',' => self.add_token(self.new_token(TokenType::Comma)),
-            '.' => self.add_token(self.new_token(TokenType::Dot)),
-            '-' => self.add_token(self.new_token(TokenType::Minus)),
-            '+' => self.add_token(self.new_token(TokenType::Plus)),
-            ';' => self.add_token(self.new_token(TokenType::Semicolon)),
-            '*' => self.add_token(self.new_token(TokenType::Star)),
+            '(' => self.add_token(self.new_token(TokenType::LeftParen, c_str)),
+            ')' => self.add_token(self.new_token(TokenType::RightParen, c_str)),
+            '{' => self.add_token(self.new_token(TokenType::LeftBrace, c_str)),
+            '}' => self.add_token(self.new_token(TokenType::RightBrace, c_str)),
+            ',' => self.add_token(self.new_token(TokenType::Comma, c_str)),
+            '.' => self.add_token(self.new_token(TokenType::Dot, c_str)),
+            '-' => self.add_token(self.new_token(TokenType::Minus, c_str)),
+            '+' => self.add_token(self.new_token(TokenType::Plus, c_str)),
+            ';' => self.add_token(self.new_token(TokenType::Semicolon, c_str)),
+            '*' => self.add_token(self.new_token(TokenType::Star, c_str)),
 
             // Whitespace
             ' ' | '\r' | '\t' => {},
@@ -104,19 +107,23 @@ impl<'s> Scanner<'s> {
             // Two character tokens
             '!' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {self.new_token(TokenType::BangEqual)} else {self.new_token(TokenType::Bang)})
+                self.add_token(if matched {self.new_token(TokenType::BangEqual, "!=".to_string())}
+                else {self.new_token(TokenType::Bang, "!".to_string())})
             },
             '=' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {self.new_token(TokenType::EqualEqual)} else {self.new_token(TokenType::Equal)})
+                self.add_token(if matched {self.new_token(TokenType::EqualEqual, "==".to_string())}
+                else {self.new_token(TokenType::Equal, "=".to_string())})
             },
             '<' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {self.new_token(TokenType::LessEqual)} else {self.new_token(TokenType::Less)})
+                self.add_token(if matched {self.new_token(TokenType::LessEqual, "<=".to_string())}
+                else {self.new_token(TokenType::Less, "<".to_string())})
             },
             '>' => {
                 let matched = self.match_char('=');
-                self.add_token(if matched {self.new_token(TokenType::GreaterEqual)} else {self.new_token(TokenType::Greater)})
+                self.add_token(if matched {self.new_token(TokenType::GreaterEqual, ">=".to_string())}
+                else {self.new_token(TokenType::Greater, ">".to_string())})
             },
             '/' => {
                 let matched = self.match_char('/');
@@ -126,7 +133,7 @@ impl<'s> Scanner<'s> {
                     }
                 }
                 else {
-                    self.add_token(self.new_token(TokenType::Slash))
+                    self.add_token(self.new_token(TokenType::Slash, "/".to_string()))
                 }
             },
 
@@ -153,11 +160,12 @@ impl<'s> Scanner<'s> {
         let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
 
         if let Some(keyword) = self.identifier_table.get(value) {
-            self.add_token(self.new_token(keyword.clone()));
+            self.add_token(self.new_token(keyword.clone(), value.to_string()));
         }
         else {
             self.add_token(self.new_token(
-                TokenType::Identifier(value.to_string())
+                TokenType::Identifier(value.to_string()),
+                value.to_string()
             ));
         }
     }
@@ -175,7 +183,8 @@ impl<'s> Scanner<'s> {
         }
         let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
         self.add_token(self.new_token(
-            TokenType::Number(value.parse::<f64>().unwrap())
+            TokenType::Number(value.parse::<f64>().unwrap()),
+            value.to_string()
         ));
     }
 
@@ -196,7 +205,8 @@ impl<'s> Scanner<'s> {
         self.advance();
         let value = std::str::from_utf8(&self.source.as_bytes()[(self.start+1)..(self.current-1)]).unwrap();
         self.add_token(self.new_token(
-            TokenType::String(value.to_string())
+            TokenType::String(value.to_string()),
+            value.to_string()
         ));
     }
 

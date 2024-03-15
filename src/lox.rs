@@ -3,19 +3,23 @@ use std::io;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::str::Utf8Error;
+use std::string::ParseError;
 use enum_kinds::EnumKind;
 
 extern crate lox_derive_ast;
-use crate::parser::Parser;
+use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::Resolver;
+use crate::scanner::ScannerError;
 
 #[derive(Clone, Debug)]
 pub struct Token {
     pub line: usize,
-    pub token_type: TokenType
+    pub token_type: TokenType,
+    pub lexeme: String
 }
 
 #[derive(Clone, EnumKind, PartialEq, Debug)]
@@ -143,7 +147,7 @@ pub mod ast {
     }
 }
 
-fn run(source: &str) -> Result<(), Box<dyn Error>>{
+fn run(source: &str) -> Result<(), RunErrorType>{
     let mut scanner = scanner::Scanner::new(source);
     let tokens = scanner.scan_tokens();
     match tokens {
@@ -152,19 +156,23 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
             match parser.parse() {
                 Ok(statements) => {
                     let mut interpreter = Interpreter::new();
+
+                    // Run Resolver
                     let mut resolver: Resolver = Resolver::new(&mut interpreter);
                     match resolver.resolve_statement_list(&statements) {
                         Ok(_) => {}
                         Err(e) => {
-                            return Err(Box::from(e));
+                            return Err(RunErrorType::Resolver(e));
                         }
                     }
+
+                    // Run interpreter
                     for s in statements {
                         if let Err(unwind) = s.accept(&mut interpreter) {
                             match unwind {
                                 Unwinder::RuntimeError(err) => {
-                                    eprintln!("{}\n[line {}]", err.msg, err.line);
-                                    return Err(Box::from(err));
+                                    let e = format!("{}\n[line {}]", err.msg, err.line);
+                                    return Err(RunErrorType::Interpreter(e));
                                 }
                                 Unwinder::ReturnValue(_) => {
                                     eprintln!("Interpreter returned a value");
@@ -175,23 +183,41 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                     }
                 }
                 Err(errs) => {
-                    for err in errs {
-                        let (t, b) = err;
-                        println!("Parse Error on line {}: {}", t.line, b);
-                    }
+                    return Err(RunErrorType::Parser(errs))
                 }
             }
         }
         Err(errors) => {
             for error in errors {
-                println!("Tokenizer error on line {}: {}", error.line, error.message);
+                eprintln!("Tokenizer error on line {}: {}", error.line, error.message);
             }
+            return Err(RunErrorType::Scanner);
         }
     }
     Ok(())
 }
 
-pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+pub enum RunErrorType {
+    Scanner,
+    Parser(Vec<ParserError>),
+    Resolver(String),
+    Interpreter(String),
+    IOError(String)
+}
+
+impl From<std::io::Error> for RunErrorType {
+    fn from(value: io::Error) -> Self {
+        RunErrorType::IOError(value.to_string())
+    }
+}
+
+impl From<Utf8Error> for RunErrorType {
+    fn from(value: Utf8Error) -> Self {
+        RunErrorType::IOError(value.to_string())
+    }
+}
+
+pub fn run_file(path: std::path::PathBuf) -> Result<(), RunErrorType> {
     let mut data: Vec<u8> = Vec::new();
     File::open(path)?.read_to_end(&mut data)?;
     let source_code = str::from_utf8(&*data)?;
@@ -199,7 +225,7 @@ pub fn run_file(path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
     return Ok(())
 }
 
-pub fn run_prompt() -> Result<(), Box<dyn Error>> {
+pub fn run_prompt() -> Result<(), RunErrorType> {
     let mut buffer = String::new();
     loop {
         io::stdout().write("> ".as_bytes())?;

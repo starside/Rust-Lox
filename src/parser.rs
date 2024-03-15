@@ -10,7 +10,7 @@ pub struct Parser<'a> {
     current: usize
 }
 
-type ParserError = (Token, String);
+pub type ParserError = (Token, String);
 type ParserResult = Result<Expr, ParserError>;
 type StatementResult = Result<Stmt, ParserError>;
 
@@ -54,17 +54,22 @@ impl<'a> Parser<'a> {
 
     fn consume(&mut self, match_type: TokenKind, error_message: String) ->  Result<Token, ParserError>
     {
-
         if self.check(&[match_type]) {
             return Ok(self.advance());
         }
+        let current = self.peek();
+        let message = format!("Error at \'{}\': {}", current.lexeme, error_message);
 
-        Err(self.error(self.peek(), error_message))
+        Err(self.error(self.peek(), message))
     }
 
     fn error(&self, token: &'a Token, message: String) -> ParserError
     {
-        (token.clone(), message)
+
+        (
+            token.clone(),
+            format!("Error at \'{}\': {}", token.lexeme, message)
+        )
     }
 
     fn match_token(&mut self, match_types: &[TokenKind]) -> bool
@@ -314,7 +319,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Grouping(Box::pin(ast::expression::Grouping{expression: expr})));
         }
 
-        Err(self.error(self.peek(), "Expected expression".to_string()))
+        Err(self.error(self.peek(), "Expect expression.".to_string()))
     }
 
     //
