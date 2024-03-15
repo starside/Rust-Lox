@@ -17,6 +17,26 @@ pub struct Resolver<'i> {
     current_function: FunctionType
 }
 
+pub struct ResolverError {
+    pub line: usize,
+    pub message: String
+}
+
+impl ResolverError {
+
+    fn new(line: usize, message: &str) -> Self {
+        ResolverError {
+            line,
+            message: message.to_string()
+        }
+    }
+    fn error(line: usize, message: &str) -> Result<(), Self>{
+        Err(
+            ResolverError::new(line, message)
+        )
+    }
+}
+
 impl<'i> Resolver<'i> {
     pub fn new(interpreter: &'i mut Interpreter) -> Self {
         Resolver{interpreter, scopes: Vec::new(), current_function: FunctionType::None}
@@ -30,28 +50,30 @@ impl<'i> Resolver<'i> {
         self.scopes.pop();
     }
 
-    fn resolve_statement(&mut self, statement: &Stmt) -> Result<(), String> {
+    fn resolve_statement(&mut self, statement: &Stmt) -> Result<(), ResolverError> {
         statement.accept(self)
     }
 
-    fn resolve_expression(&mut self, expr: &Expr) -> Result<(), String> {
+    fn resolve_expression(&mut self, expr: &Expr) -> Result<(), ResolverError> {
         expr.accept(self)
     }
 
-    pub fn resolve_statement_list(&mut self, statements: &StmtList) -> Result<(), String> {
+    pub fn resolve_statement_list(&mut self, statements: &StmtList) -> Result<(), ResolverError> {
         for statement in statements.iter() {
             self.resolve_statement(statement)?;
         }
         Ok(())
     }
 
-    fn resolve_function(&mut self, function: &Function, function_type: FunctionType) -> Result<(), String> {
+    fn resolve_function(&mut self, function: &Function, function_type: FunctionType) -> Result<(), ResolverError> {
         let enclosing_function= self.current_function;
         self.current_function = function_type;
         self.begin_scope();
         for param in function.params.iter() {
             if let TokenType::Identifier(pn) = &param.token_type {
-                self.declare(pn)?;
+                self.declare(pn).map_err(|x| {
+                    ResolverError::new(param.line, &x)
+                })?;
                 self.define(pn);
             } else {
                 panic!("Parser fucked up");
@@ -96,8 +118,8 @@ impl<'i> Resolver<'i> {
     }
 }
 
-impl AstVisitor<Result<(), String>> for Resolver<'_>{
-    fn visit_assign(&mut self, assign: &Assign) -> Result<(), String> {
+impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
+    fn visit_assign(&mut self, assign: &Assign) -> Result<(), ResolverError> {
         self.resolve_expression(&assign.value)?;
         let name = if let Expr::Variable(name) = &assign.name {
             &name.name
@@ -108,13 +130,13 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         Ok(())
     }
 
-    fn visit_binary(&mut self, binary: &Binary) -> Result<(), String> {
+    fn visit_binary(&mut self, binary: &Binary) -> Result<(), ResolverError> {
         self.resolve_expression(&binary.left)?;
         self.resolve_expression(&binary.right)?;
         Ok(())
     }
 
-    fn visit_call(&mut self, call: &Call) -> Result<(), String> {
+    fn visit_call(&mut self, call: &Call) -> Result<(), ResolverError> {
         self.resolve_expression(&call.callee)?;
         for arg in call.arguments.iter() {
             self.resolve_expression(arg)?;
@@ -122,33 +144,33 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         Ok(())
     }
 
-    fn visit_grouping(&mut self, paren: &Grouping) -> Result<(), String> {
+    fn visit_grouping(&mut self, paren: &Grouping) -> Result<(), ResolverError> {
         self.resolve_expression(&paren.expression)?;
         Ok(())
     }
 
-    fn visit_literal(&mut self, _: &Literal) -> Result<(), String> {
+    fn visit_literal(&mut self, _: &Literal) -> Result<(), ResolverError> {
         Ok(())
     }
 
-    fn visit_logical(&mut self, logical: &Logical) -> Result<(), String> {
+    fn visit_logical(&mut self, logical: &Logical) -> Result<(), ResolverError> {
         self.resolve_expression(&logical.left)?;
         self.resolve_expression(&logical.right)?;
         Ok(())
     }
 
-    fn visit_unary(&mut self, unary: &Unary) -> Result<(), String> {
+    fn visit_unary(&mut self, unary: &Unary) -> Result<(), ResolverError> {
         self.resolve_expression(&unary.right)?;
         Ok(())
     }
 
-    fn visit_variable(&mut self, var: &Variable) -> Result<(), String> {
+    fn visit_variable(&mut self, var: &Variable) -> Result<(), ResolverError> {
         let name = &var.name;
         if let Some(scope) = self.scopes.last_mut() {
             if let Some(value) = scope.get(&name.lexeme) {
                 if *value == false {
                     // TODO:  Lost line information
-                    return Err("Can't read local variable in its own initializer.".to_string());
+                    return ResolverError::error(var.name.line, "Can't read local variable in its own initializer.");
                 }
             }
         }
@@ -156,32 +178,32 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         Ok(())
     }
 }
-impl StmtVisitor<Result<(), String>> for Resolver<'_> {
-    fn visit_block(&mut self, block: &Block) -> Result<(), String> {
+impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
+    fn visit_block(&mut self, block: &Block) -> Result<(), ResolverError> {
         self.begin_scope();
         self.resolve_statement_list(&block.statements)?;
         self.end_scope();
         Ok(())
     }
 
-    fn visit_expression(&mut self, expr: &Expression) -> Result<(), String> {
+    fn visit_expression(&mut self, expr: &Expression) -> Result<(), ResolverError> {
         self.resolve_expression(&expr.expression)?;
         Ok(())
     }
 
-    fn visit_function(&mut self, stmt: &Function) -> Result<(), String> {
+    fn visit_function(&mut self, stmt: &Function) -> Result<(), ResolverError> {
         let name = if let TokenType::Identifier(x) = &stmt.name.token_type {
             x
         } else {
             panic!("Parser fucked up")
         };
-        self.declare(name)?;
+        self.declare(name).map_err(|x| {ResolverError::new(stmt.name.line, &x)})?;
         self.define(name);
         self.resolve_function(stmt, FunctionType::Function)?;
         Ok(())
     }
 
-    fn visit_if(&mut self, ifstmt: &If) -> Result<(), String> {
+    fn visit_if(&mut self, ifstmt: &If) -> Result<(), ResolverError> {
         self.resolve_expression(&ifstmt.condition)?;
         self.resolve_statement(&ifstmt.then_branch)?;
         if let Stmt::Empty = ifstmt.else_branch {}
@@ -191,14 +213,16 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_print(&mut self, stmt: &Print) -> Result<(), String> {
+    fn visit_print(&mut self, stmt: &Print) -> Result<(), ResolverError> {
         self.resolve_expression(&stmt.expression)?;
         Ok(())
     }
 
-    fn visit_return(&mut self, stmt: &Return) -> Result<(), String> {
+    fn visit_return(&mut self, stmt: &Return) -> Result<(), ResolverError> {
+        //stmt.keyword.line
         if self.current_function == FunctionType::None {
-            return Err("Can't return from top-level code.".to_string());
+            return ResolverError::error(stmt.keyword.line,
+                 &format!("Error at \'{}\': Can't return from top-level code.", stmt.keyword.lexeme))
         }
         if let Expr::Empty = stmt.value {}
         else {
@@ -207,9 +231,9 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_var(&mut self, var: &Var) -> Result<(), String> {
+    fn visit_var(&mut self, var: &Var) -> Result<(), ResolverError> {
         let name = &var.name.lexeme;
-        self.declare(name)?;
+        self.declare(name).map_err(|x| ResolverError::new(var.name.line, &x))?;
         if let Expr::Empty = var.initializer {}
         else {
             self.resolve_expression(&var.initializer)?;
@@ -218,7 +242,7 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
         Ok(())
     }
 
-    fn visit_while(&mut self, stmt: &While) -> Result<(), String> {
+    fn visit_while(&mut self, stmt: &While) -> Result<(), ResolverError> {
         self.resolve_expression(&stmt.condition)?;
         self.resolve_statement(&stmt.body)?;
         Ok(())

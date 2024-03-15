@@ -12,7 +12,7 @@ use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
-use crate::resolver::Resolver;
+use crate::resolver::{Resolver, ResolverError};
 use crate::scanner::ScannerError;
 
 #[derive(Clone, Debug)]
@@ -201,7 +201,7 @@ fn run(source: &str) -> Result<(), RunErrorType>{
 pub enum RunErrorType {
     Scanner(Vec<(usize, String)>),
     Parser(Vec<ParserError>),
-    Resolver(String),
+    Resolver(ResolverError),
     Interpreter(String),
     IOError(String)
 }
