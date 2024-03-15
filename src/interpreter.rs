@@ -33,10 +33,10 @@ impl EvalValue {
         }
     }
 
-    pub fn get_callable(&self) -> Result<LValueType, Unwinder> {
+    pub fn get_callable(&self, line: usize) -> Result<LValueType, Unwinder> {
         match self {
             EvalValue::RValue(x) => {Err(Unwinder::RuntimeError(
-                RuntimeErrorReport::new("Cannot convert to callable", 0)))
+                RuntimeErrorReport::new("Can only call functions and classes.", line)))
             }
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
@@ -309,10 +309,26 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
 {
     match (x, y) {
         (LiteralValue::Nil, LiteralValue::Nil) => { true}
+        (LiteralValue::Nil, _) => { false }
+        (_, LiteralValue::Nil) => { false }
         (LiteralValue::Boolean(a), LiteralValue::Boolean(b)) => {a == b}
         (LiteralValue::Number(a), LiteralValue::Number(b)) => {a == b}
         (LiteralValue::String(a), LiteralValue::String(b)) => {a == b}
         (_, _) => {false}
+    }
+}
+
+fn check_number_operand(line: usize, operand: &LiteralValue) -> Result<(), Unwinder> {
+    match operand {
+        LiteralValue::Number(_) => {Ok(())}
+        _ => Err(Unwinder::error("Operand must be a number.", line))
+    }
+}
+
+fn check_number_operands(line: usize, left: &LiteralValue, right: &LiteralValue) -> Result<(f64, f64), Unwinder> {
+    match (left, right) {
+        (LiteralValue::Number(l), LiteralValue::Number(r)) => {Ok((*l, *r))}
+        _ => Err(Unwinder::error("Operands must be numbers.", line))
     }
 }
 
@@ -449,7 +465,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
                 println!("{}", x);
             }
             LiteralValue::Nil => {
-                println!("Nil");
+                println!("nil");
             }
         }
         Ok(())
@@ -509,58 +525,61 @@ impl AstVisitor<RunValue> for Interpreter {
         let right = binary.right.accept(self)?;
         let right = right.get_literal();
 
-        match (&left, &right) {
-            // If both operands are strings
-            (LiteralValue::String(l), LiteralValue::String(r)) => {
-                match binary.operator.token_type {
-                    TokenType::Plus => {
+        let line = binary.operator.line;
+
+        let value: LiteralValue = match binary.operator.token_type {
+            TokenType::BangEqual => {LiteralValue::Boolean(!is_equal(&left, &right))}
+            TokenType::EqualEqual => {LiteralValue::Boolean(is_equal(&left, &right))}
+            TokenType::Minus => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Number(l - r)
+            }
+            TokenType::Plus => {
+                match (&left, &right) {
+                    (LiteralValue::String(l), LiteralValue::String(r)) => {
                         let mut new_str = l.to_string();
                         new_str.push_str(r);
-                        Ok(LiteralValue::String(new_str).into())
+                        LiteralValue::String(new_str)
                     }
-
-                    TokenType::BangEqual => {
-                        Ok(LiteralValue::Boolean(!is_equal(&left, &right)).into())
-                    }
-
-                    TokenType::EqualEqual => {
-                        Ok(LiteralValue::Boolean(is_equal(&left, &right)).into())
-                    }
-                    _ => {
-                        Err(Unwinder::error("Invalid binary operation between strings",
-                                            binary.operator.line))
+                    (LiteralValue::Number(l), LiteralValue::Number(r)) => {LiteralValue::Number(l+r)}
+                    _ => {return Err(Unwinder::error("Operands must be two numbers or two strings.", binary.operator.line));}
                     }
                 }
-
+            TokenType::Slash => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Number(l/r)
+            }
+            TokenType::Star => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Number(l*r)
+            }
+            TokenType::Greater => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Boolean(l > r)
+            }
+            TokenType::GreaterEqual => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Boolean(l >= r)
+            }
+            TokenType::Less => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Boolean(l < r)
+            }
+            TokenType::LessEqual => {
+                let (l, r) = check_number_operands(line, &left, &right)?;
+                LiteralValue::Boolean(l <= r)
             }
 
-            // If Both operands are numbers
-            (LiteralValue::Number(l), LiteralValue::Number(r)) => {
-                match binary.operator.token_type {
-                    TokenType::Plus => {Ok(LiteralValue::Number(l+r).into())}
-                    TokenType::Minus => {Ok(LiteralValue::Number(l-r).into())}
-                    TokenType::Star => {Ok(LiteralValue::Number(l*r).into())}
-                    TokenType::Slash => {Ok(LiteralValue::Number(l/r).into())}
-                    TokenType::BangEqual => {Ok(LiteralValue::Boolean(l != r).into())}
-                    TokenType::EqualEqual => {Ok(LiteralValue::Boolean(l == r).into())}
-                    TokenType::Greater => {Ok(LiteralValue::Boolean(l > r).into())}
-                    TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r).into())}
-                    TokenType::Less => {Ok(LiteralValue::Boolean(l < r).into())}
-                    TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r).into())}
-                    _ => {Err(
-                        Unwinder::error("Unknown operand between two Numbers", binary.operator.line)
-                    )}
-                }
-            }
             _ => {
-                Err(Unwinder::error("Operands must be numbers.", binary.operator.line))
+                panic!("Invalid token type, should have been caught in parser")
             }
-        }
+        };
+        Ok(EvalValue::from(value))
     }
 
     fn visit_call(&mut self, expr: &Call) -> RunValue {
         let callee = expr.callee.accept(self)?;
-        let callee = callee.get_callable()?;
+        let callee = callee.get_callable(expr.paren.line)?;
 
         if expr.arguments.len() != callee.arity(){
             //let err = format!("Line {}, expected {} but got {} arguments",
@@ -624,7 +643,7 @@ impl AstVisitor<RunValue> for Interpreter {
             TokenType::Bang => {
                 EvalValue::from(
                     LiteralValue::Boolean(
-                        is_truthy(&right.get_literal())
+                        !is_truthy(&right.get_literal())
                     )
                 )
             }
