@@ -616,7 +616,7 @@ impl AstVisitor<RunValue> for Interpreter {
                     LiteralValue::Number(-x).into()
                 }
                 else {
-                    return Err(Unwinder::error("Unary minus must operate on a number",
+                    return Err(Unwinder::error("Operand must be a number.",
                                                unary.operator.line))
                 }
             }
