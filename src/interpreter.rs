@@ -582,9 +582,8 @@ impl AstVisitor<RunValue> for Interpreter {
         let callee = callee.get_callable(expr.paren.line)?;
 
         if expr.arguments.len() != callee.arity(){
-            //let err = format!("Line {}, expected {} but got {} arguments",
-            //                  expr.paren.line, callee.arity(), expr.arguments.len());
-            return Err(Unwinder::error("Incorrect number of arguments", expr.paren.line));
+            let err = format!("Expected {} arguments but got {}.", callee.arity(), expr.arguments.len());
+            return Err(Unwinder::error(&err, expr.paren.line));
         }
 
         let mut arguments: Vec<EvalValue> = Vec::new();

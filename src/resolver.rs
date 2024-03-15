@@ -64,10 +64,11 @@ impl<'i> Resolver<'i> {
     }
 
     fn resolve_local(&mut self, exprid: ExprId, name: &str) {
-        let idx = (0..self.scopes.len()).rev();
-        for (i, scope) in idx.zip(self.scopes.iter()) {
+        let idx = 0..self.scopes.len();
+        let num_scopes = self.scopes.len();
+        for (i, scope) in idx.zip(self.scopes.iter()).rev() {
             if scope.contains_key(name) {
-                self.interpreter.resolve(exprid, i);
+                self.interpreter.resolve(exprid, num_scopes - 1 - i);
                 return;
             }
         }

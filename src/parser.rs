@@ -494,7 +494,7 @@ impl<'a> Parser<'a> {
         if !self.check(&[TokenKind::RightParen]) {
             loop {
                 if params.len() >= 255 {
-                    return Err(self.error(self.peek(), "Functions have 255 parameters max".to_string()));
+                    return Err(self.error(self.peek(), "Can't have more than 255 parameters.".to_string()));
                 }
                 params.push(self.consume(TokenKind::Identifier, "Expect an identifier".to_string())?);
                 if !self.match_token(&[TokenKind::Comma]) {
