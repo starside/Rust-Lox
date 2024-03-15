@@ -149,7 +149,7 @@ impl<'s> Scanner<'s> {
     }
 
     fn identifier(&mut self) {
-        while self.peek().is_ascii_alphanumeric() {self.advance();}
+        while self.peek().is_ascii_alphanumeric() || self.peek() == '_' {self.advance();}
         let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
 
         if let Some(keyword) = self.identifier_table.get(value) {
