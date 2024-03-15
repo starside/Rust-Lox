@@ -18,7 +18,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = CommandLine::parse();
 
     if let Some(path) = args.script {
-        run_file(path)?;
+        match run_file(path) {
+            Ok(_) => {}
+            Err(_) => {
+                std::process::exit(70);
+            }
+        }
     }
     else {
         run_prompt()?;

@@ -4,6 +4,7 @@ use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::ptr::addr_of;
 use std::rc::Rc;
@@ -11,7 +12,7 @@ use std::time::{Instant};
 
 
 pub trait Callable {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, String>;
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport>;
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
 }
@@ -34,7 +35,9 @@ impl EvalValue {
 
     pub fn get_callable(&self) -> Result<LValueType, Unwinder> {
         match self {
-            EvalValue::RValue(_) => {Err(Unwinder::RuntimeError("Cannot convert to callable".to_string()))}
+            EvalValue::RValue(x) => {Err(Unwinder::RuntimeError(
+                RuntimeErrorReport::new("Cannot convert to callable", 0)))
+            }
             EvalValue::LValue(l) => {Ok(l.clone())}
         }
     }
@@ -61,7 +64,7 @@ pub struct Environment {
 struct BuiltinFunctionTime;
 
 impl Callable for BuiltinFunctionTime {
-    fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> Result<EvalValue, String> {
+    fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         Ok(EvalValue::RValue(LiteralValue::Number(
             Instant::now().duration_since(interpreter.boot_time).as_micros() as f64
         )))
@@ -109,7 +112,7 @@ impl LoxFunction {
     }
 }
 impl Callable for LoxFunction {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, String> {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         let environment = Environment::new(Some(self.closure.clone()));
 
         for (arg_name, arg_value) in self.params.iter().zip(arguments) {
@@ -122,15 +125,13 @@ impl Callable for LoxFunction {
         let run_result = if let Stmt::Block(x) = a.deref() {
             interpreter.execute_block(&x.statements, Environment::new(Some(environment)))
         } else {
-            Err(
-                Unwinder::RuntimeError("Somehow not executing a block.  This is a bug".to_string())
-            )
+            panic!("Somehow not executing a block.  This is a bug")
         };
 
         if let Err(unwinder) =  run_result {
             match unwinder {
-                Unwinder::RuntimeError(e) => {
-                    return Err(e);
+                Unwinder::RuntimeError(err) => {
+                    return Err(err);
                 }
                 Unwinder::ReturnValue(val) => {
                     return Ok(val);
@@ -169,7 +170,7 @@ impl Environment {
     pub fn assign(
         &mut self,
         name: &String,
-        value: &EvalValue) -> Result<(),String> {
+        value: &EvalValue) -> Result<(), String> {
 
         // Check current scope
         if self.values.contains_key(name) {
@@ -187,8 +188,7 @@ impl Environment {
             }
             current_env = env.borrow().enclosing.clone();
         }
-
-        Err(format!("L-value {} is not defined but was assigned to", &name).to_string())
+        Err(format!("L-value {} is not defined but was assigned to", &name))
     }
 
     pub fn get(
@@ -210,7 +210,7 @@ impl Environment {
             current_env = env.borrow().enclosing.clone();
         }
 
-        Err(format!("Variable {} is not found", &name).to_string())
+        Err(format!("Variable {} is not found", &name))
     }
 
     fn ancestor(&self, distance:usize) ->Option<EnvironmentRef> {
@@ -257,15 +257,10 @@ impl Environment {
             self.values.insert(name.to_string(), value.clone());
         }
         else {
-            let a = self.ancestor(distance).expect("Parser fucked up");
+            let a = self.ancestor(distance)
+                .expect("The resolver determined this variable exists, it is a bug if not found");
             a.borrow_mut().values.insert(name.to_string(), value.clone());
         }
-    }
-}
-
-impl From<String> for Unwinder {
-    fn from(value: String) -> Self {
-        Unwinder::RuntimeError(value)
     }
 }
 
@@ -321,9 +316,50 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
     }
 }
 
+#[derive(Debug)]
+pub struct RuntimeErrorReport {
+    pub msg: String,
+    pub line: usize
+}
+
+impl Display for RuntimeErrorReport {
+    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for RuntimeErrorReport {
+
+}
+
+impl RuntimeErrorReport {
+    fn new(msg: &str, line: usize) -> Self {
+        RuntimeErrorReport {
+            msg: msg.to_string(),
+            line
+        }
+    }
+}
+
 pub enum Unwinder {
-    RuntimeError(String),
+    RuntimeError(RuntimeErrorReport),
     ReturnValue(EvalValue)
+}
+
+impl From<RuntimeErrorReport> for Unwinder {
+    fn from(value: RuntimeErrorReport) -> Self {
+        Unwinder::RuntimeError(
+            value
+        )
+    }
+}
+
+impl Unwinder {
+    pub fn error(message: &str, line: usize) -> Self {
+        Unwinder::RuntimeError(
+            RuntimeErrorReport::new(message, line)
+        )
+    }
 }
 
 impl Interpreter {
@@ -434,7 +470,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
                 stmt.initializer.accept(self)?
             }
         };
-        self.environment.borrow_mut().define(&stmt.name, value);
+        self.environment.borrow_mut().define(&stmt.name.lexeme, value);
         Ok(())
     }
 
@@ -457,24 +493,26 @@ impl AstVisitor<RunValue> for Interpreter {
 
         let exprid = addr_of!(*expr) as ExprId;
         if let Some(distance) = self.locals.get(&exprid) {
-            self.environment.borrow_mut().assign_at(*distance, name, &value);
+            self.environment.borrow_mut().assign_at(*distance, &name.lexeme, &value);
         } else {
-            self.globals.borrow_mut().assign(name, &value)?;
+            if let Err(err) = self.globals.borrow_mut().assign(&name.lexeme, &value) {
+                return Err(Unwinder::error(&err, 0));
+            }
         }
 
         return Ok(value);
     }
 
-    fn visit_binary(&mut self, visitor: &Binary) -> RunValue {
-        let left = visitor.left.accept(self)?;
+    fn visit_binary(&mut self, binary: &Binary) -> RunValue {
+        let left = binary.left.accept(self)?;
         let left = left.get_literal();
-        let right = visitor.right.accept(self)?;
+        let right = binary.right.accept(self)?;
         let right = right.get_literal();
 
         match (&left, &right) {
             // If both operands are strings
             (LiteralValue::String(l), LiteralValue::String(r)) => {
-                match visitor.operator.token_type {
+                match binary.operator.token_type {
                     TokenType::Plus => {
                         let mut new_str = l.to_string();
                         new_str.push_str(r);
@@ -489,7 +527,8 @@ impl AstVisitor<RunValue> for Interpreter {
                         Ok(LiteralValue::Boolean(is_equal(&left, &right)).into())
                     }
                     _ => {
-                        Err("Invalid binary operation between strings".to_string().into())
+                        Err(Unwinder::error("Invalid binary operation between strings",
+                                            binary.operator.line))
                     }
                 }
 
@@ -497,7 +536,7 @@ impl AstVisitor<RunValue> for Interpreter {
 
             // If Both operands are numbers
             (LiteralValue::Number(l), LiteralValue::Number(r)) => {
-                match visitor.operator.token_type {
+                match binary.operator.token_type {
                     TokenType::Plus => {Ok(LiteralValue::Number(l+r).into())}
                     TokenType::Minus => {Ok(LiteralValue::Number(l-r).into())}
                     TokenType::Star => {Ok(LiteralValue::Number(l*r).into())}
@@ -508,12 +547,13 @@ impl AstVisitor<RunValue> for Interpreter {
                     TokenType::GreaterEqual => {Ok(LiteralValue::Boolean(l >= r).into())}
                     TokenType::Less => {Ok(LiteralValue::Boolean(l < r).into())}
                     TokenType::LessEqual => {Ok(LiteralValue::Boolean(l <= r).into())}
-                    _ => Err("Unknown operand between two Numbers".to_string().into())
+                    _ => {Err(
+                        Unwinder::error("Unknown operand between two Numbers", binary.operator.line)
+                    )}
                 }
             }
-
             _ => {
-                Err("Operands must be two numbers or two strings".to_string().into())
+                Err(Unwinder::error("Operands must be numbers.", binary.operator.line))
             }
         }
     }
@@ -523,9 +563,9 @@ impl AstVisitor<RunValue> for Interpreter {
         let callee = callee.get_callable()?;
 
         if expr.arguments.len() != callee.arity(){
-            let err = format!("Line {}, expected {} but got {} arguments",
-                              expr.paren.line, callee.arity(), expr.arguments.len());
-            return Err(err.into());
+            //let err = format!("Line {}, expected {} but got {} arguments",
+            //                  expr.paren.line, callee.arity(), expr.arguments.len());
+            return Err(Unwinder::error("Incorrect number of arguments", expr.paren.line));
         }
 
         let mut arguments: Vec<EvalValue> = Vec::new();
@@ -567,37 +607,38 @@ impl AstVisitor<RunValue> for Interpreter {
         logical.right.accept(self)
     }
 
-    fn visit_unary(&mut self, visitor: &Unary) -> RunValue {
-        let right = visitor.right.accept(self)?;
+    fn visit_unary(&mut self, unary: &Unary) -> RunValue {
+        let right = unary.right.accept(self)?;
 
-        let value = match visitor.operator.token_type {
+        let value = match unary.operator.token_type {
             TokenType::Minus => {
                 if let LiteralValue::Number(x) = right.get_literal() {
-                    Ok(LiteralValue::Number(-x).into())
+                    LiteralValue::Number(-x).into()
                 }
                 else {
-                    Err("Unary minus must operate on a number".to_string())
+                    return Err(Unwinder::error("Unary minus must operate on a number",
+                                               unary.operator.line))
                 }
             }
 
             TokenType::Bang => {
-                Ok(
-                    EvalValue::from(
-                        LiteralValue::Boolean(
-                            is_truthy(&right.get_literal())
-                        )
+                EvalValue::from(
+                    LiteralValue::Boolean(
+                        is_truthy(&right.get_literal())
                     )
                 )
             }
-            _ => Err("Unknown unary operator".to_string())
+            _ => return Err(Unwinder::error("Unknown unary operator", unary.operator.line))
         };
 
-        Ok(value?)
+        Ok(value)
     }
 
     fn visit_variable(&mut self, varname: &Variable) -> RunValue {
         let e: ExprId = addr_of!(*varname) as ExprId;
-        let v = self.lookup_variable(&varname.name, e)?;
-        Ok(v)
+        match self.lookup_variable(&varname.name.lexeme, e) {
+            Ok(v) => {Ok(v)}
+            Err(err) => {Err(Unwinder::error(&err, varname.name.line))}
+        }
     }
 }

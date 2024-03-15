@@ -103,7 +103,7 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
         } else {
             panic!("Parser fucked up");
         };
-        self.resolve_local(addr_of!(*assign) as ExprId, name);
+        self.resolve_local(addr_of!(*assign) as ExprId, &name.lexeme);
         Ok(())
     }
 
@@ -144,14 +144,14 @@ impl AstVisitor<Result<(), String>> for Resolver<'_>{
     fn visit_variable(&mut self, var: &Variable) -> Result<(), String> {
         let name = &var.name;
         if let Some(scope) = self.scopes.last_mut() {
-            if let Some(value) = scope.get(name) {
+            if let Some(value) = scope.get(&name.lexeme) {
                 if *value == false {
                     // TODO:  Lost line information
                     return Err("Can't read local variable in its own initializer.".to_string());
                 }
             }
         }
-        self.resolve_local(addr_of!(*var) as ExprId, name);
+        self.resolve_local(addr_of!(*var) as ExprId, &name.lexeme);
         Ok(())
     }
 }
@@ -207,7 +207,7 @@ impl StmtVisitor<Result<(), String>> for Resolver<'_> {
     }
 
     fn visit_var(&mut self, var: &Var) -> Result<(), String> {
-        let name = var.name.as_str();
+        let name = &var.name.lexeme;
         self.declare(name)?;
         if let Expr::Empty = var.initializer {}
         else {

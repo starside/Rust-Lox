@@ -1,6 +1,6 @@
 use std::pin::Pin;
 use std::rc::Rc;
-use crate::lox::ast::LiteralValue;
+use crate::lox::ast::{LiteralValue, VarName};
 use crate::lox::{ast, Token, TokenKind, TokenType};
 use crate::lox::ast::expression::{Binary, Call, Expr, Literal, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
@@ -300,9 +300,11 @@ impl<'a> Parser<'a> {
 
         if self.match_token(
             &[TokenKind::Identifier]) {
-            let previous = &self.previous().token_type;
+            let pt = self.previous();
+            let previous = &pt.token_type;
+            let line = pt.line;
             if let TokenType::Identifier(x) = previous {
-                return Ok(Expr::Variable(Box::pin(ast::expression::Variable{name: x.clone()})));
+                return Ok(Expr::Variable(Box::pin(ast::expression::Variable{name: VarName::new(x, line)})));
             };
         }
 
@@ -545,9 +547,9 @@ impl<'a> Parser<'a> {
             Expr::Empty
         };
         self.consume(TokenKind::Semicolon, "Expect ';' after variable declaration.".to_string())?;
-        let new_id = if let TokenType::Identifier(x) = name.token_type
+        let new_id = if let TokenType::Identifier(x) = &name.token_type
         {
-            Box::pin(Var {name: x, initializer})
+            Box::pin(Var {name: VarName::new(x, name.line), initializer})
         } else {
             panic!("Logic error!")
         };

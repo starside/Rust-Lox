@@ -80,7 +80,21 @@ pub mod ast {
         Nil
     }
 
-    type VarName = String;
+    //type VarName = String;
+    #[derive(Clone)]
+    pub struct VarName {
+        pub lexeme: String,
+        pub line: usize
+    }
+
+    impl VarName {
+        pub fn new(name: &str, line: usize) -> Self {
+            VarName {
+                lexeme: name.to_string(),
+                line
+            }
+        }
+    }
 
     pub mod expression{
         use std::pin::Pin;
@@ -148,9 +162,12 @@ fn run(source: &str) -> Result<(), Box<dyn Error>>{
                     for s in statements {
                         if let Err(unwind) = s.accept(&mut interpreter) {
                             match unwind {
-                                Unwinder::RuntimeError(err) => {println!("Runtime Error: {}", err);}
+                                Unwinder::RuntimeError(err) => {
+                                    eprintln!("{}\n[line {}]", err.msg, err.line);
+                                    return Err(Box::from(err));
+                                }
                                 Unwinder::ReturnValue(_) => {
-                                    println!("Interpreter returned a value");
+                                    eprintln!("Interpreter returned a value");
                                 }
                             }
 
