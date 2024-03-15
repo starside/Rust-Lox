@@ -57,10 +57,8 @@ impl<'a> Parser<'a> {
         if self.check(&[match_type]) {
             return Ok(self.advance());
         }
-        let current = self.peek();
-        let message = format!("Error at \'{}\': {}", current.lexeme, error_message);
 
-        Err(self.error(self.peek(), message))
+        Err(self.error(self.peek(), error_message))
     }
 
     fn error(&self, token: &'a Token, message: String) -> ParserError
@@ -630,7 +628,7 @@ impl<'a> Parser<'a> {
 
     fn expression_statement(&mut self) -> StatementResult {
         let value = self.expression()?;
-        self.consume(TokenKind::Semicolon, "Expected ; after expression".to_string())?;
+        self.consume(TokenKind::Semicolon, "Expect \';\' after expression.".to_string())?;
         Ok(
             Stmt::Expression(Box::pin(
                 Expression{expression: value}

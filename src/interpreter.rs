@@ -210,7 +210,7 @@ impl Environment {
             current_env = env.borrow().enclosing.clone();
         }
 
-        Err(format!("Variable {} is not found", &name))
+        Err(format!("Undefined variable \'{}\'.", &name))
     }
 
     fn ancestor(&self, distance:usize) ->Option<EnvironmentRef> {
