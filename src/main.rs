@@ -21,7 +21,10 @@ fn process_status_code(status: Result<(), RunErrorType>) {
         Ok(_) => {}
         Err(x) => {
             match x {
-                RunErrorType::Scanner => {
+                RunErrorType::Scanner(msgs) => {
+                    for (line, msg) in msgs {
+                        eprintln!("[line {}] Error: {}", line, msg);
+                    }
                     std::process::exit(65);
                 }
                 RunErrorType::Parser(msgs) => {

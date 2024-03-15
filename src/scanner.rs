@@ -197,7 +197,7 @@ impl<'s> Scanner<'s> {
         }
 
         if self.is_at_end() {
-            self.error("Unterminated string".to_string());
+            self.error("Unterminated string.".to_string());
             return;
         }
 

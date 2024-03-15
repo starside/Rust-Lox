@@ -188,17 +188,18 @@ fn run(source: &str) -> Result<(), RunErrorType>{
             }
         }
         Err(errors) => {
-            for error in errors {
-                eprintln!("Tokenizer error on line {}: {}", error.line, error.message);
-            }
-            return Err(RunErrorType::Scanner);
+            let scanner_report: Vec<(usize, String)> =
+                errors.iter().map(|x| {
+                    (x.line, x.message.clone())
+                }).collect();
+            return Err(RunErrorType::Scanner(scanner_report));
         }
     }
     Ok(())
 }
 
 pub enum RunErrorType {
-    Scanner,
+    Scanner(Vec<(usize, String)>),
     Parser(Vec<ParserError>),
     Resolver(String),
     Interpreter(String),
