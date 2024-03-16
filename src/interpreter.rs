@@ -188,7 +188,7 @@ impl Environment {
             }
             current_env = env.borrow().enclosing.clone();
         }
-        Err(format!("L-value {} is not defined but was assigned to", &name))
+        Err(format!("Undefined variable \'{}\'.", &name))
     }
 
     pub fn get(
@@ -512,7 +512,7 @@ impl AstVisitor<RunValue> for Interpreter {
             self.environment.borrow_mut().assign_at(*distance, &name.lexeme, &value);
         } else {
             if let Err(err) = self.globals.borrow_mut().assign(&name.lexeme, &value) {
-                return Err(Unwinder::error(&err, 0));
+                return Err(Unwinder::error(&err, name.line));
             }
         }
 
