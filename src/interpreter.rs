@@ -66,7 +66,7 @@ struct BuiltinFunctionTime;
 impl Callable for BuiltinFunctionTime {
     fn call(&self, interpreter: &mut Interpreter, _arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         Ok(EvalValue::RValue(LiteralValue::Number(
-            Instant::now().duration_since(interpreter.boot_time).as_micros() as f64
+            Instant::now().duration_since(interpreter.boot_time).as_micros()as f64 / 1_000_000.0
         )))
     }
     fn arity(&self) -> usize {
@@ -74,7 +74,7 @@ impl Callable for BuiltinFunctionTime {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String("<fn builtin time>".to_string())
+        LiteralValue::String("<native fn>".to_string())
     }
 }
 
@@ -146,7 +146,7 @@ impl Callable for LoxFunction {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String(format!("<fn {} >", self.name))
+        LiteralValue::String(format!("<fn {}>", self.name))
     }
 }
 
@@ -277,7 +277,7 @@ impl<'a> Interpreter {
         let global_env = Environment::new(None);
         {
             let mut ge = global_env.borrow_mut();
-            ge.define("time", EvalValue::LValue(
+            ge.define("clock", EvalValue::LValue(
                 Rc::new(Box::new(BuiltinFunctionTime))
             ));
         }
