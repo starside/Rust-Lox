@@ -3,7 +3,7 @@ use std::ptr::addr_of;
 use crate::interpreter::{ExprId, Interpreter};
 use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept, Block, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
-use crate::lox::{TokenType};
+use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
 
 type HashMap<K, V> = FxHashMap<K, V>;
@@ -16,7 +16,7 @@ enum FunctionType {
 
 pub struct Resolver<'i> {
     interpreter: &'i mut Interpreter,
-    scopes: Vec<HashMap<String, bool>>,
+    scopes: Vec<HashMap<RunString, bool>>,
     current_function: FunctionType
 }
 
@@ -93,7 +93,7 @@ impl<'i> Resolver<'i> {
         Ok(())
     }
 
-    fn resolve_local(&mut self, exprid: ExprId, name: &str) {
+    fn resolve_local(&mut self, exprid: ExprId, name: &RunString) {
         let idx = 0..self.scopes.len();
         let num_scopes = self.scopes.len();
         for (i, scope) in idx.zip(self.scopes.iter()).rev() {
@@ -104,16 +104,16 @@ impl<'i> Resolver<'i> {
         }
     }
 
-    fn declare(&mut self, name: &str) -> Result<(), String> {
+    fn declare(&mut self, name: &RunString) -> Result<(), String> {
         if let Some(scope) = self.scopes.last_mut() {
-            if scope.insert(String::from(name), false).is_some() {
+            if scope.insert(name.clone(), false).is_some() {
                 return Err("Already a variable with this name in this scope.".to_string());
             }
         }
         Ok(())
     }
 
-    fn define(&mut self, name: &str) {
+    fn define(&mut self, name: &RunString) {
         if let Some(scope) = self.scopes.last_mut() {
             if let Some(value) = scope.get_mut(name) {
                 *value = true;

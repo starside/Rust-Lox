@@ -89,14 +89,14 @@ pub mod ast {
     //type VarName = String;
     #[derive(Clone)]
     pub struct VarName {
-        pub lexeme: String,
+        pub lexeme: RunString,
         pub line: usize
     }
 
     impl VarName {
-        pub fn new(name: &str, line: usize) -> Self {
+        pub fn new(name: &RunString, line: usize) -> Self {
             VarName {
-                lexeme: name.to_string(),
+                lexeme: name.clone(),
                 line
             }
         }
