@@ -176,7 +176,9 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
             if let Some(value) = scope.get(&name.lexeme) {
                 if *value == false {
                     // TODO:  Lost line information
-                    return ResolverError::error(var.name.line, "Can't read local variable in its own initializer.");
+                    return ResolverError::error(var.name.line,
+                    &format!("Error at \'{}\': {}", var.name.lexeme,
+                            "Can't read local variable in its own initializer."));
                 }
             }
         }
