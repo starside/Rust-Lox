@@ -1,6 +1,5 @@
 use std::str;
 use std::io;
-use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::str::Utf8Error;
@@ -10,7 +9,7 @@ extern crate lox_derive_ast;
 use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
-use crate::lox::ast::statement::{Accept as StatementAccept, Stmt};
+use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::{Resolver, ResolverError};
 
 #[derive(Clone, Debug)]

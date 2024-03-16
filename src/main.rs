@@ -4,7 +4,6 @@ mod parser;
 mod interpreter;
 mod resolver;
 
-use std::error::Error;
 use crate::lox::{run_prompt, run_file, RunErrorType};
 use clap;
 use clap::Parser;

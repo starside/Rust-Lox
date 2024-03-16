@@ -318,13 +318,6 @@ fn is_equal(x: &LiteralValue, y: &LiteralValue) -> bool
     }
 }
 
-fn check_number_operand(line: usize, operand: &LiteralValue) -> Result<(), Unwinder> {
-    match operand {
-        LiteralValue::Number(_) => {Ok(())}
-        _ => Err(Unwinder::error("Operand must be a number.", line))
-    }
-}
-
 fn check_number_operands(line: usize, left: &LiteralValue, right: &LiteralValue) -> Result<(f64, f64), Unwinder> {
     match (left, right) {
         (LiteralValue::Number(l), LiteralValue::Number(r)) => {Ok((*l, *r))}
@@ -608,13 +601,15 @@ impl AstVisitor<RunValue> for Interpreter {
 
         match logical.operator.token_type {
             TokenType::And => {
-                if !is_truthy(&left) {
-                    return Ok(left.clone().into());
+                let t = is_truthy(&left);
+                if !t {
+                    return Ok(left.into());
                 }
             }
             TokenType::Or => {
-                if is_truthy(&left) {
-                    return Ok(left.clone().into());
+                let t = is_truthy(&left);
+                if t {
+                    return Ok(left.into());
                 }
             }
             _ => {
