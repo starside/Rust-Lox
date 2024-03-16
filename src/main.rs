@@ -19,14 +19,11 @@ fn process_status_code(status: Result<(), RunErrorType>) {
         Ok(_) => {}
         Err(x) => {
             match x {
-                RunErrorType::Scanner(msgs) => {
-                    for (line, msg) in msgs {
+                RunErrorType::ScannerParser(scan_errors, parse_errors) => {
+                    for (line, msg) in scan_errors {
                         eprintln!("[line {}] Error: {}", line, msg);
                     }
-                    std::process::exit(65);
-                }
-                RunErrorType::Parser(msgs) => {
-                    for err in msgs {
+                    for err in parse_errors {
                         let (t, b) = err;
                         eprintln!("[line {}] {}", t.line, b);
                     }

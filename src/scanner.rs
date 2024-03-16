@@ -53,7 +53,7 @@ impl<'s> Scanner<'s> {
         identifiers
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, &Vec<ScannerError>>{
+    pub fn scan_tokens(&mut self) -> (&Vec<Token>, &Vec<ScannerError>){
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
@@ -62,13 +62,7 @@ impl<'s> Scanner<'s> {
             TokenType::Eof,
             "".to_string()
         ));
-
-        if self.errors.is_empty() {
-            Ok(&self.tokens)
-        }
-        else {
-            Err(&self.errors)
-        }
+        (&self.tokens, &self.errors)
     }
 
     fn is_at_end(&self) -> bool {

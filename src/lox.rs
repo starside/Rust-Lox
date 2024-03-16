@@ -10,7 +10,7 @@ extern crate lox_derive_ast;
 use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
-use crate::lox::ast::statement::{Accept as StatementAccept};
+use crate::lox::ast::statement::{Accept as StatementAccept, Stmt};
 use crate::resolver::{Resolver, ResolverError};
 
 #[derive(Clone, Debug)]
@@ -147,58 +147,59 @@ pub mod ast {
 
 fn run(source: &str) -> Result<(), RunErrorType>{
     let mut scanner = scanner::Scanner::new(source);
-    let tokens = scanner.scan_tokens();
-    match tokens {
-        Ok(tokens) => {
-            let mut parser = Parser::new(tokens);
-            match parser.parse() {
-                Ok(statements) => {
-                    let mut interpreter = Interpreter::new();
+    let (tokens, scan_errors) = scanner.scan_tokens();
+    let mut parser = Parser::new(tokens);
+    let parse_results = parser.parse();
 
-                    // Run Resolver
-                    let mut resolver: Resolver = Resolver::new(&mut interpreter);
-                    match resolver.resolve_statement_list(&statements) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            return Err(RunErrorType::Resolver(e));
-                        }
-                    }
+    let (statements, parse_errors) = match parse_results {
+        Ok(x) => {
+            (x, Vec::new())
+        }
+        Err(e) => {
+            (Vec::new(), e)
+        }
+    };
 
-                    // Run interpreter
-                    for s in statements {
-                        if let Err(unwind) = s.accept(&mut interpreter) {
-                            match unwind {
-                                Unwinder::RuntimeError(err) => {
-                                    let e = format!("{}\n[line {}]", err.msg, err.line);
-                                    return Err(RunErrorType::Interpreter(e));
-                                }
-                                Unwinder::ReturnValue(_) => {
-                                    eprintln!("Interpreter returned a value");
-                                }
-                            }
+    // Bail if there was a scanner or parser error
+    if !scan_errors.is_empty() || !parse_errors.is_empty(){
+        let scanner_report: Vec<(usize, String)> =
+            scan_errors.iter().map(|x| {
+                (x.line, x.message.clone())
+            }).collect();
+        return Err(RunErrorType::ScannerParser(scanner_report, parse_errors))
+    }
 
-                        }
-                    }
+    let mut interpreter = Interpreter::new();
+    let mut resolver: Resolver = Resolver::new(&mut interpreter);
+
+    // Run Resolver
+    match resolver.resolve_statement_list(&statements) {
+        Ok(_) => {}
+        Err(e) => {
+            return Err(RunErrorType::Resolver(e));
+        }
+    }
+
+    // Run interpreter
+    for s in statements {
+        if let Err(unwind) = s.accept(&mut interpreter) {
+            match unwind {
+                Unwinder::RuntimeError(err) => {
+                    let e = format!("{}\n[line {}]", err.msg, err.line);
+                    return Err(RunErrorType::Interpreter(e));
                 }
-                Err(errs) => {
-                    return Err(RunErrorType::Parser(errs))
+                Unwinder::ReturnValue(_) => {
+                    eprintln!("Interpreter returned a value");
                 }
             }
-        }
-        Err(errors) => {
-            let scanner_report: Vec<(usize, String)> =
-                errors.iter().map(|x| {
-                    (x.line, x.message.clone())
-                }).collect();
-            return Err(RunErrorType::Scanner(scanner_report));
+
         }
     }
     Ok(())
 }
 
 pub enum RunErrorType {
-    Scanner(Vec<(usize, String)>),
-    Parser(Vec<ParserError>),
+    ScannerParser(Vec<(usize, String)>, Vec<ParserError>),
     Resolver(ResolverError),
     Interpreter(String),
     IOError(String)
