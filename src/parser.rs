@@ -541,7 +541,7 @@ impl<'a> Parser<'a> {
 
     fn var_declaration(&mut self) -> StatementResult {
         let name = self.consume(TokenKind::Identifier,
-                                "Expect variable name".to_string())?;
+                                "Expect variable name.".to_string())?;
 
         let initializer = if self.match_token(&[TokenKind::Equal]) {
             self.expression()?

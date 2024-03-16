@@ -72,7 +72,8 @@ impl<'i> Resolver<'i> {
         for param in function.params.iter() {
             if let TokenType::Identifier(pn) = &param.token_type {
                 self.declare(pn).map_err(|x| {
-                    ResolverError::new(param.line, &x)
+                    let m = format!("Error at \'{}\': {}", param.lexeme, &x);
+                    ResolverError::new(param.line, &m)
                 })?;
                 self.define(pn);
             } else {
@@ -233,7 +234,10 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
 
     fn visit_var(&mut self, var: &Var) -> Result<(), ResolverError> {
         let name = &var.name.lexeme;
-        self.declare(name).map_err(|x| ResolverError::new(var.name.line, &x))?;
+        self.declare(name).map_err(|x| {
+            let m = format!("Error at \'{}\': {}", name,  &x);
+            ResolverError::new(var.name.line, &m)
+        })?;
         if let Expr::Empty = var.initializer {}
         else {
             self.resolve_expression(&var.initializer)?;
