@@ -219,21 +219,21 @@ impl From<Utf8Error> for RunErrorType {
 pub fn run_file(path: std::path::PathBuf) -> Result<(), RunErrorType> {
     let mut data: Vec<u8> = Vec::new();
     File::open(path)?.read_to_end(&mut data)?;
-    let source_code = str::from_utf8(&*data)?;
+    let source_code = str::from_utf8(&data)?;
     run(source_code)?;
-    return Ok(())
+    Ok(())
 }
 
 pub fn run_prompt() -> Result<(), RunErrorType> {
     let mut buffer = String::new();
     loop {
-        io::stdout().write("> ".as_bytes())?;
+        io::stdout().write_all("> ".as_ref())?;
         io::stdout().flush()?;
         let bytes_read = io::stdin().read_line(&mut buffer)?;
         if bytes_read == 0 {
             break;
         }
-        run(&buffer.trim())?;
+        run(buffer.trim())?;
         buffer.clear();
     }
     Ok(())

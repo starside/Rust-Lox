@@ -151,7 +151,7 @@ impl<'s> Scanner<'s> {
 
     fn identifier(&mut self) {
         while self.peek().is_ascii_alphanumeric() || self.peek() == '_' {self.advance();}
-        let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
+        let value = std::str::from_utf8((self.source[self.start..self.current]).as_ref()).unwrap();
 
         if let Some(keyword) = self.identifier_table.get(value) {
             self.add_token(self.new_token(keyword.clone(), value.to_string()));
@@ -175,7 +175,7 @@ impl<'s> Scanner<'s> {
                 self.advance();
             }
         }
-        let value = std::str::from_utf8(&self.source.as_bytes()[self.start..self.current]).unwrap();
+        let value = std::str::from_utf8((self.source[self.start..self.current]).as_ref()).unwrap();
         self.add_token(self.new_token(
             TokenType::Number(value.parse::<f64>().unwrap()),
             value.to_string()
@@ -197,7 +197,7 @@ impl<'s> Scanner<'s> {
 
         // The closing "
         self.advance();
-        let value = std::str::from_utf8(&self.source.as_bytes()[(self.start+1)..(self.current-1)]).unwrap();
+        let value = std::str::from_utf8((self.source[(self.start+1)..(self.current-1)]).as_ref()).unwrap();
         self.add_token(self.new_token(
             TokenType::String(value.to_string()),
             value.to_string()

@@ -5,7 +5,6 @@ mod interpreter;
 mod resolver;
 
 use crate::lox::{run_prompt, run_file, RunErrorType};
-use clap;
 use clap::Parser;
 
 #[derive(clap::Parser)]

@@ -271,7 +271,7 @@ pub struct Interpreter {
     locals: HashMap<ExprId, usize>
 }
 
-impl<'a> Interpreter {
+impl Interpreter {
     pub fn new() -> Self {
         let locals: HashMap<ExprId, usize> = HashMap::new();
         let global_env = Environment::new(None);
@@ -434,12 +434,11 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
     fn visit_if(&mut self, ifstmt: &If) -> Result<(), Unwinder> {
         if is_truthy(&ifstmt.condition.accept(self)?.get_literal()) {
             ifstmt.then_branch.accept(self)?;
-        } else {
-            if let Stmt::Empty = ifstmt.else_branch {}
-            else {
-                ifstmt.else_branch.accept(self)?;
-            }
+        } else if let Stmt::Empty = ifstmt.else_branch {}
+        else {
+            ifstmt.else_branch.accept(self)?;
         }
+
         Ok(())
     }
 
@@ -503,13 +502,11 @@ impl AstVisitor<RunValue> for Interpreter {
         let exprid = addr_of!(*expr) as ExprId;
         if let Some(distance) = self.locals.get(&exprid) {
             self.environment.borrow_mut().assign_at(*distance, &name.lexeme, &value);
-        } else {
-            if let Err(err) = self.globals.borrow_mut().assign(&name.lexeme, &value) {
-                return Err(Unwinder::error(&err, name.line));
-            }
+        } else if let Err(err) = self.globals.borrow_mut().assign(&name.lexeme, &value) {
+            return Err(Unwinder::error(&err, name.line));
         }
 
-        return Ok(value);
+        Ok(value)
     }
 
     fn visit_binary(&mut self, binary: &Binary) -> RunValue {

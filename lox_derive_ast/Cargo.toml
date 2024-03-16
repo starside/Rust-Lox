@@ -12,3 +12,6 @@ proc-macro2 = "1.0.76"
 
 [lib]
 proc-macro = true
+
+[profile.release]
+debug = true

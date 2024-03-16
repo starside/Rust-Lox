@@ -107,7 +107,7 @@ impl<'a> Parser<'a> {
             let right = self.term()?;
             left =
                 Expr::Binary(
-                    Pin::new(Box::new(Binary{left: left, operator, right: right}))
+                    Pin::new(Box::new(Binary{left, operator, right}))
                 );
         }
 
@@ -180,7 +180,7 @@ impl<'a> Parser<'a> {
             let right = self.comparison()?;
             left =
                 Expr::Binary(
-                    Box::pin(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left, operator, right})
                 );
         }
 
@@ -201,7 +201,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.factor()?;
             left = Expr::Binary(
-                    Box::pin(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left, operator, right})
                 );
         }
 
@@ -217,7 +217,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             left = Expr::Binary(
-                    Box::pin(Binary{left: left, operator, right: right})
+                    Box::pin(Binary{left, operator, right})
                 );
         }
 
@@ -270,7 +270,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary(
-                    Box::pin(Unary{operator, right: right})
+                    Box::pin(Unary{operator, right})
                 )
             );
         }
