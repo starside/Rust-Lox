@@ -151,7 +151,7 @@ impl<'s> Scanner<'s> {
             },
 
             // Error
-            _ => self.error(format!("Unexpected character {}", c))
+            _ => self.error("Unexpected character.".to_string())
         };
     }
 

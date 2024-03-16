@@ -123,7 +123,7 @@ impl<'a> Parser<'a> {
             match &expr {
                 Expr::Variable(_) => {}
                 _ => {
-                    return Err(self.error(&equals, "Invalid target assignment".to_string()));
+                    return Err(self.error(&equals, "Invalid assignment target.".to_string()));
                 }
             };
             return Ok(Expr::Assign(
