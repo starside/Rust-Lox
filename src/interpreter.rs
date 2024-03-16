@@ -9,6 +9,8 @@ use std::ptr::addr_of;
 use std::rc::Rc;
 use std::time::{Instant};
 use rustc_hash::{FxHashMap};
+use crate::lox::RunString;
+
 type HashMap<K, V> = FxHashMap<K, V>;
 
 
@@ -75,13 +77,13 @@ impl Callable for BuiltinFunctionTime {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String("<native fn>".to_string())
+        LiteralValue::String(Rc::new("<native fn>".to_string()))
     }
 }
 
 struct LoxFunction {
-    name: String,
-    params: Vec<String>,
+    name: RunString,
+    params: Vec<RunString>,
     body: ast::statement::FuncBody,
     closure: EnvironmentRef
 }
@@ -92,7 +94,7 @@ impl LoxFunction {
             n.clone()
         } else { panic!("Parser fucked up") };
 
-        let params: Vec<String> =
+        let params: Vec<RunString> =
         function.params.iter().map(
             |x| {
                 if let TokenType::Identifier(i) = &x.token_type {
@@ -147,7 +149,7 @@ impl Callable for LoxFunction {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String(format!("<fn {}>", self.name))
+        LiteralValue::String(Rc::new(format!("<fn {}>", self.name)))
     }
 }
 
@@ -530,7 +532,7 @@ impl AstVisitor<RunValue> for Interpreter {
                     (LiteralValue::String(l), LiteralValue::String(r)) => {
                         let mut new_str = l.to_string();
                         new_str.push_str(r);
-                        LiteralValue::String(new_str)
+                        LiteralValue::String(Rc::new(new_str))
                     }
                     (LiteralValue::Number(l), LiteralValue::Number(r)) => {LiteralValue::Number(l+r)}
                     _ => {return Err(Unwinder::error("Operands must be two numbers or two strings.", binary.operator.line));}

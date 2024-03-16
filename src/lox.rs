@@ -2,6 +2,7 @@ use std::str;
 use std::io;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::rc::Rc;
 use std::str::Utf8Error;
 use enum_kinds::EnumKind;
 
@@ -11,6 +12,8 @@ use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::{Resolver, ResolverError};
+
+pub(crate) type RunString = Rc<String>;
 
 #[derive(Clone, Debug)]
 pub struct Token {
@@ -46,8 +49,8 @@ pub enum TokenType {
     EqualEqual,
 
     // Literals
-    Identifier(String),
-    String(String),
+    Identifier(RunString),
+    String(RunString),
     Number(f64),
 
     // Keywords
@@ -73,9 +76,11 @@ pub enum TokenType {
 }
 
 pub mod ast {
+    use crate::lox::RunString;
+
     #[derive(Clone, Debug)]
     pub enum LiteralValue {
-        String(String),
+        String(RunString),
         Number(f64),
         Boolean(bool),
         Nil

@@ -1,7 +1,7 @@
 use crate::lox::{Token, TokenType};
 use rustc_hash::{FxHashMap};
-
 type HashMap<K, V> = FxHashMap<K, V>;
+use std::rc::Rc;
 
 pub struct ScannerError {
     pub line: usize,
@@ -160,7 +160,7 @@ impl<'s> Scanner<'s> {
         }
         else {
             self.add_token(self.new_token(
-                TokenType::Identifier(value.to_string()),
+                TokenType::Identifier(Rc::new(value.to_string())),
                 value.to_string()
             ));
         }
@@ -201,7 +201,7 @@ impl<'s> Scanner<'s> {
         self.advance();
         let value = std::str::from_utf8((self.source[(self.start+1)..(self.current-1)]).as_ref()).unwrap();
         self.add_token(self.new_token(
-            TokenType::String(value.to_string()),
+            TokenType::String(Rc::new(value.to_string())),
             value.to_string()
         ));
     }
