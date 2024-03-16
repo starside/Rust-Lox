@@ -3,12 +3,13 @@ use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::ptr::addr_of;
 use std::rc::Rc;
 use std::time::{Instant};
+use rustc_hash::{FxHashMap};
+type HashMap<K, V> = FxHashMap<K, V>;
 
 
 pub trait Callable {
@@ -157,7 +158,7 @@ impl Environment {
             RefCell::new(
                 Environment {
                     enclosing,
-                    values: HashMap::new()
+                    values: HashMap::default()
                 }
             )
         )
@@ -273,7 +274,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let locals: HashMap<ExprId, usize> = HashMap::new();
+        let locals: HashMap<ExprId, usize> = HashMap::default();
         let global_env = Environment::new(None);
         {
             let mut ge = global_env.borrow_mut();

@@ -1,5 +1,7 @@
 use crate::lox::{Token, TokenType};
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap};
+
+type HashMap<K, V> = FxHashMap<K, V>;
 
 pub struct ScannerError {
     pub line: usize,
@@ -32,7 +34,7 @@ impl<'s> Scanner<'s> {
     }
 
     fn build_identifier_hash() -> HashMap<&'static str, TokenType>{
-        let mut identifiers:HashMap<&str, TokenType> = HashMap::new();
+        let mut identifiers:HashMap<&str, TokenType> = HashMap::default();
 
         identifiers.insert("and", TokenType::And);
         identifiers.insert("class", TokenType::Class);
