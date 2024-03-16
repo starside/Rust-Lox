@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::ptr::addr_of;
 use crate::interpreter::{ExprId, Interpreter};
 use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
@@ -80,7 +81,11 @@ impl<'i> Resolver<'i> {
                 panic!("Parser fucked up");
             }
         }
-        self.resolve_statement(&function.body)?;
+        if let Stmt::Block(x) = &function.body.deref().deref(){
+            self.resolve_statement_list(&x.statements)?;
+        } else {
+            panic!("Bug in parser or resolver")
+        }
         self.end_scope();
         self.current_function = enclosing_function;
         Ok(())

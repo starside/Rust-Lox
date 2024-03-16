@@ -14,8 +14,6 @@ struct CommandLine {
     script: Option<std::path::PathBuf>
 }
 
-type ErrorCode = i32;
-
 fn process_status_code(status: Result<(), RunErrorType>) {
     match status {
         Ok(_) => {}

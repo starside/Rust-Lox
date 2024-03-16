@@ -4,7 +4,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::str::Utf8Error;
-use std::string::ParseError;
 use enum_kinds::EnumKind;
 
 extern crate lox_derive_ast;
@@ -13,7 +12,6 @@ use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
 use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::{Resolver, ResolverError};
-use crate::scanner::ScannerError;
 
 #[derive(Clone, Debug)]
 pub struct Token {

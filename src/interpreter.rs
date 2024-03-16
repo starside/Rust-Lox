@@ -35,7 +35,7 @@ impl EvalValue {
 
     pub fn get_callable(&self, line: usize) -> Result<LValueType, Unwinder> {
         match self {
-            EvalValue::RValue(x) => {Err(Unwinder::RuntimeError(
+            EvalValue::RValue(_) => {Err(Unwinder::RuntimeError(
                 RuntimeErrorReport::new("Can only call functions and classes.", line)))
             }
             EvalValue::LValue(l) => {Ok(l.clone())}
@@ -123,7 +123,7 @@ impl Callable for LoxFunction {
         let binding = self.body.clone();
         let a = binding.deref();
         let run_result = if let Stmt::Block(x) = a.deref() {
-            interpreter.execute_block(&x.statements, Environment::new(Some(environment)))
+            interpreter.execute_block(&x.statements, environment)
         } else {
             panic!("Somehow not executing a block.  This is a bug")
         };
