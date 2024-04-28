@@ -134,6 +134,7 @@ pub mod ast {
         derive_ast!(
             Stmt/Stmt/
             Block: StmtList statements;
+            Class : Token name, FuncList methods;
             Expression : Expr expression;
             Function: Token name, TokenList params, FuncBody body;
             If: Expr condition, Stmt then_branch, Stmt else_branch;
@@ -144,6 +145,7 @@ pub mod ast {
         );
 
         pub(crate) type StmtList = Vec<Stmt>;
+        pub type FuncList = Vec<Pin<Box<Function>>>;
         type TokenList = Vec<Token>;
         pub type FuncBody = Rc<Pin<Box<Stmt>>>; // Can I eliminate this with lifetimes?
     }

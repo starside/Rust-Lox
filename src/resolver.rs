@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::ptr::addr_of;
 use crate::interpreter::{ExprId, Interpreter};
 use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept, Block, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
+use crate::lox::ast::statement::{Accept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
 
@@ -192,6 +192,17 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.begin_scope();
         self.resolve_statement_list(&block.statements)?;
         self.end_scope();
+        Ok(())
+    }
+
+    fn visit_class(&mut self, class: &Class) -> Result<(), ResolverError> {
+        let name = if let TokenType::Identifier(x) = &class.name.token_type {
+            x
+        } else {
+            panic!("Parser fucked up")
+        };
+        self.declare(name).map_err(|x| {ResolverError::new(class.name.line, &x)})?;
+        self.define(name);
         Ok(())
     }
 

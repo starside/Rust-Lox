@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::lox::ast::{LiteralValue, VarName};
 use crate::lox::{ast, Token, TokenKind, TokenType};
 use crate::lox::ast::expression::{Binary, Call, Expr, Literal, Unary};
-use crate::lox::ast::statement::{Print, Expression, Stmt, Var};
+use crate::lox::ast::statement::{Print, Expression, Stmt, Var, FuncList};
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -525,7 +525,11 @@ impl<'a> Parser<'a> {
     fn declaration(&mut self) -> StatementResult {
         let result = if self.match_token(&[TokenKind::Var]) {
             self.var_declaration()
-        } else if self.match_token(&[TokenKind::Fun]) {
+        }
+        else if self.match_token(&[TokenKind::Class]){
+            self.class_declaration()
+        }
+        else if self.match_token(&[TokenKind::Fun]) {
             self.fun_declaration()
         }
         else{
@@ -537,6 +541,33 @@ impl<'a> Parser<'a> {
         }
 
         result
+    }
+
+    fn class_declaration(&mut self) -> StatementResult {
+        let name = self.consume(TokenKind::Identifier, "Expect class name".to_string())?;
+        self.consume(TokenKind::LeftBrace, "Expect '{' before class body.".to_string())?;
+        let mut methods: FuncList = Vec::new();
+        while !self.check(&[TokenKind::RightBrace]) && !self.is_at_end() {
+            let funres = self.fun_declaration()?;
+            match funres {
+                Stmt::Function(f) => {
+                    methods.push(f);
+                }
+                _ => {panic!("Impossible, not a function")}
+            }
+        }
+
+        self.consume(TokenKind::RightBrace, "Expect '}' after class body.".to_string())?;
+        Ok(
+            Stmt::Class(
+                Box::pin(
+                    ast::statement::Class {
+                        name,
+                        methods
+                    }
+                )
+            )
+        )
     }
 
     fn var_declaration(&mut self) -> StatementResult {

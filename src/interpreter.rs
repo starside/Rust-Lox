@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::lox::ast::statement::{Accept as StmtAccept, Block, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
+use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::ptr::addr_of;
@@ -78,6 +78,24 @@ impl Callable for BuiltinFunctionTime {
 
     fn to_literal(&self) -> LiteralValue {
         LiteralValue::String(Rc::new("<native fn>".to_string()))
+    }
+}
+
+struct LoxClass {
+    name: RunString
+}
+
+impl Callable for LoxClass {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
+        todo!()
+    }
+
+    fn arity(&self) -> usize {
+        todo!()
+    }
+
+    fn to_literal(&self) -> LiteralValue {
+        LiteralValue::String(Rc::new(format!("<class {}>", self.name)))
     }
 }
 
@@ -406,6 +424,24 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
         let new_env = Environment::new(Some(self.environment.clone()));
         self.execute_block(&block.statements,
                            new_env)?;
+        Ok(())
+    }
+
+    fn visit_class(&mut self, class: &Class) -> Result<(), Unwinder> {
+        let name = if let TokenType::Identifier(name) = &class.name.token_type {
+            name
+        } else {
+            panic!("Parser messed up function token");
+        };
+
+        let mut env = self.environment.borrow_mut();
+        env.define(name, EvalValue::RValue(LiteralValue::Nil));
+        let klass = LoxClass {
+            name: name.clone()
+        };
+        env.assign(name, &EvalValue::LValue(
+            Rc::new(Box::new(klass))
+        )).expect("Failed to assign");
         Ok(())
     }
 
