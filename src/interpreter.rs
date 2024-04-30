@@ -81,17 +81,61 @@ impl Callable for BuiltinFunctionTime {
     }
 }
 
-struct LoxClass {
-    name: RunString
+struct LoxInstance {
+    class: LoxClassRef
 }
 
-impl Callable for LoxClass {
+impl LoxInstance {
+    pub fn to_literal(&self) -> LiteralValue {
+        LiteralValue::String(Rc::new("<instance>".to_string()))
+    }
+}
+
+impl Callable for LoxInstance {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         todo!()
     }
 
     fn arity(&self) -> usize {
         todo!()
+    }
+
+    fn to_literal(&self) -> LiteralValue {
+        LiteralValue::String(Rc::new(format!("<instance>")))
+    }
+}
+
+struct LoxClass {
+    name: RunString
+}
+
+impl LoxClass {
+    pub fn new_ref(name: RunString) -> LoxClassRef {
+        Rc::new(Box::new(
+            LoxClass {
+                name
+            }
+        ))
+    }
+}
+
+type LoxClassRef = Rc<Box<LoxClass>>;
+
+impl Callable for LoxClassRef {
+    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
+        Ok(
+            EvalValue::LValue(
+                Rc::new(Box::new(
+                    LoxInstance {
+                        class: self.clone()
+                    }
+                ))
+            )
+        )
+    }
+
+    fn arity(&self) -> usize {
+        0
     }
 
     fn to_literal(&self) -> LiteralValue {
@@ -436,11 +480,9 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         let mut env = self.environment.borrow_mut();
         env.define(name, EvalValue::RValue(LiteralValue::Nil));
-        let klass = LoxClass {
-            name: name.clone()
-        };
+        let class =LoxClass::new_ref(name.clone());
         env.assign(name, &EvalValue::LValue(
-            Rc::new(Box::new(klass))
+            Rc::new(Box::new(class))
         )).expect("Failed to assign");
         Ok(())
     }
