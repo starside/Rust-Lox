@@ -85,13 +85,21 @@ struct LoxInstance {
     class: LoxClassRef
 }
 
+type LoxInstanceRef = Rc<Box<LoxInstance>>;
+
 impl LoxInstance {
-    pub fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String(Rc::new("<instance>".to_string()))
+    pub fn new(class: &LoxClassRef) -> LoxInstanceRef {
+        Rc::new(
+            Box::new(
+                LoxInstance {
+                    class: class.clone()
+                }
+            )
+        )
     }
 }
 
-impl Callable for LoxInstance {
+impl Callable for LoxInstanceRef {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         todo!()
     }
@@ -101,7 +109,8 @@ impl Callable for LoxInstance {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String(Rc::new(format!("<instance>")))
+        let name = self.class.name.clone();
+        LiteralValue::String(Rc::new(format!("<instance {}>", name).to_string()))
     }
 }
 
@@ -125,11 +134,11 @@ impl Callable for LoxClassRef {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         Ok(
             EvalValue::LValue(
-                Rc::new(Box::new(
-                    LoxInstance {
-                        class: self.clone()
-                    }
-                ))
+                Rc::new(
+                    Box::new(
+                        LoxInstance::new(self)
+                    )
+                )
             )
         )
     }
