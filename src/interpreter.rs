@@ -18,6 +18,7 @@ pub trait Callable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport>;
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
+    fn to_instance(&self) -> Option<LoxInstanceRef>;
 }
 
 type LValueType = Rc<Box<dyn Callable>>;
@@ -79,20 +80,34 @@ impl Callable for BuiltinFunctionTime {
     fn to_literal(&self) -> LiteralValue {
         LiteralValue::String(Rc::new("<native fn>".to_string()))
     }
+
+    fn to_instance(&self) -> Option<LoxInstanceRef> {
+        None
+    }
 }
 
 struct LoxInstance {
-    class: LoxClassRef
+    class: LoxClassRef,
+    fields: HashMap<RunString, EvalValue>
 }
 
 type LoxInstanceRef = Rc<Box<LoxInstance>>;
 
 impl LoxInstance {
+    pub fn get(&self, name: &str) -> Result<EvalValue, Unwinder> {
+        let name = Rc::new(name.to_string());
+        if let Some(value) =  self.fields.get(&name) {
+            Ok(value.clone())
+        } else {
+            Err(Unwinder::error(&format!("Undefined property '{}'.", name), 0))
+        }
+    }
     pub fn new(class: &LoxClassRef) -> LoxInstanceRef {
         Rc::new(
             Box::new(
                 LoxInstance {
-                    class: class.clone()
+                    class: class.clone(),
+                    fields: HashMap::default()
                 }
             )
         )
@@ -111,6 +126,10 @@ impl Callable for LoxInstanceRef {
     fn to_literal(&self) -> LiteralValue {
         let name = self.class.name.clone();
         LiteralValue::String(Rc::new(format!("<instance {}>", name).to_string()))
+    }
+
+    fn to_instance(&self) -> Option<LoxInstanceRef> {
+        Some(self.clone())
     }
 }
 
@@ -149,6 +168,10 @@ impl Callable for LoxClassRef {
 
     fn to_literal(&self) -> LiteralValue {
         LiteralValue::String(Rc::new(format!("<class {}>", self.name)))
+    }
+
+    fn to_instance(&self) -> Option<LoxInstanceRef> {
+        None
     }
 }
 
@@ -221,6 +244,10 @@ impl Callable for LoxFunction {
 
     fn to_literal(&self) -> LiteralValue {
         LiteralValue::String(Rc::new(format!("<fn {}>", self.name)))
+    }
+
+    fn to_instance(&self) -> Option<LoxInstanceRef> {
+        None
     }
 }
 
@@ -676,8 +703,12 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_get(&mut self, expr: &Get) -> RunValue {
         let object = expr.object.accept(self)?;
-        //let object = object.get_callable()
-        todo!()
+        let object = object.get_callable(expr.name.line)?;
+        if let Some(instance) = object.to_instance() {
+            instance.get(&expr.name.lexeme)?;
+            todo!()
+        }
+        Err(Unwinder::error("Only instances have properties.", expr.name.line))
     }
 
     fn visit_grouping(&mut self, visitor: &Grouping) -> RunValue {
