@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::ptr::addr_of;
 use crate::interpreter::{ExprId, Interpreter};
-use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
+use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
@@ -149,6 +149,11 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
         for arg in call.arguments.iter() {
             self.resolve_expression(arg)?;
         }
+        Ok(())
+    }
+
+    fn visit_get(&mut self, expr: &Get) -> Result<(), ResolverError> {
+        self.resolve_expression(&expr.object)?;
         Ok(())
     }
 

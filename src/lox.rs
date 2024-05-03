@@ -113,6 +113,7 @@ pub mod ast {
             Assign: Expr name, Expr value;
             Binary : Expr left, Token operator, Expr right;
             Call: Expr callee, Token paren, ExprList arguments;
+            Get: Expr object, Token name;
             Grouping : Expr expression;
             Literal : LiteralValue value;
             Logical :  Expr left, Token operator, Expr right;

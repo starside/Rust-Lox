@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -672,6 +672,12 @@ impl AstVisitor<RunValue> for Interpreter {
         }
 
         Ok(callee.call(self, arguments)?)
+    }
+
+    fn visit_get(&mut self, expr: &Get) -> RunValue {
+        let object = expr.object.accept(self)?;
+        //let object = object.get_callable()
+        todo!()
     }
 
     fn visit_grouping(&mut self, visitor: &Grouping) -> RunValue {

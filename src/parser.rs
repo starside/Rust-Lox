@@ -255,6 +255,17 @@ impl<'a> Parser<'a> {
         loop {
             if self.match_token(&[TokenKind::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_token(&[TokenKind::Dot]) {
+                let name = self.consume(TokenKind::Identifier,
+                                        "Expect property name after '.'.".to_string())?;
+                expr = Expr::Get(
+                    Box::pin(
+                        ast::expression::Get{
+                            object: expr,
+                            name: name
+                        }
+                    )
+                );
             } else {
                 break;
             }
