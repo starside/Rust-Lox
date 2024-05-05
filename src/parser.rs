@@ -323,6 +323,10 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(Box::pin(ast::expression::Literal{value})));
         }
 
+        if self.match_token(&[TokenKind::This]) {
+            return Ok(Expr::This(Box::pin(ast::expression::This{keyword: self.previous().clone()})));
+        }
+
         if self.match_token(
             &[TokenKind::Identifier]) {
             let pt = self.previous();

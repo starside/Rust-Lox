@@ -1,7 +1,8 @@
 use std::ops::Deref;
 use std::ptr::addr_of;
+use std::rc::Rc;
 use crate::interpreter::{ExprId, Interpreter};
-use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Unary, Variable};
+use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable};
 use crate::lox::ast::statement::{Accept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
@@ -179,6 +180,11 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
         Ok(())
     }
 
+    fn visit_this(&mut self, this: &This) -> Result<(), ResolverError> {
+        self.resolve_local(addr_of!(*this) as ExprId, &Rc::new(this.keyword.lexeme.clone()));
+        Ok(())
+    }
+
     fn visit_unary(&mut self, unary: &Unary) -> Result<(), ResolverError> {
         self.resolve_expression(&unary.right)?;
         Ok(())
@@ -216,9 +222,14 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.declare(name).map_err(|x| {ResolverError::new(class.name.line, &x)})?;
         self.define(name);
 
+        self.begin_scope();
+        self.scopes.last_mut().unwrap().insert(Rc::new("this".to_string()), true);
+
         for method in &class.methods {
             self.resolve_function(method, FunctionType::Method)?;
         }
+
+        self.end_scope();
 
         Ok(())
     }

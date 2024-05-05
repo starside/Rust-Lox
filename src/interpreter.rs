@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -19,6 +19,7 @@ pub trait Callable {
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
     fn to_instance(&self) -> Option<LoxInstanceRef>;
+    fn bind(&self, instance: &LoxInstanceRef) -> LValueType;
 }
 
 type LValueType = Rc<Box<dyn Callable>>;
@@ -84,6 +85,10 @@ impl Callable for BuiltinFunctionTime {
     fn to_instance(&self) -> Option<LoxInstanceRef> {
         None
     }
+
+    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+        todo!()
+    }
 }
 
 struct LoxInstance {
@@ -94,13 +99,14 @@ struct LoxInstance {
 type LoxInstanceRef = Rc<RefCell<LoxInstance>>;
 
 impl LoxInstance {
-    pub fn get(&self, name: &str) -> Result<EvalValue, Unwinder> {
+    pub fn get(instance: &LoxInstanceRef, name: &str) -> Result<EvalValue, Unwinder> {
         let name = Rc::new(name.to_string());
-        if let Some(value) =  self.fields.get(&name) {
+        if let Some(value) =  instance.borrow().fields.get(&name) {
             Ok(value.clone())
         } else {
-            if let Some(method) = &self.class.find_method(&name) {
-                return Ok(EvalValue::LValue(method.clone()));
+            if let Some(method) = &instance.borrow().class.find_method(&name) {
+                let bound_method = method.bind(instance);
+                return Ok(EvalValue::LValue(bound_method));
             }
             Err(Unwinder::error(&format!("Undefined property '{}'.", name), 0))
         }
@@ -139,6 +145,10 @@ impl Callable for LoxInstanceRef {
 
     fn to_instance(&self) -> Option<LoxInstanceRef> {
         Some(self.clone())
+    }
+
+    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+        todo!()
     }
 }
 
@@ -192,6 +202,10 @@ impl Callable for LoxClassRef {
     fn to_instance(&self) -> Option<LoxInstanceRef> {
         None
     }
+
+    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+        todo!()
+    }
 }
 
 struct LoxFunction {
@@ -228,6 +242,21 @@ impl LoxFunction {
     }
 }
 impl Callable for LoxFunction {
+    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+        let mut environment = Environment::new(Some(self.closure.clone()));
+        environment.borrow_mut().define("this",
+                                        EvalValue::LValue(
+                                            Rc::new(Box::new(instance.clone()))
+                                        ));
+        let new_func = LoxFunction {
+            name: self.name.clone(),
+            params: self.params.clone(),
+            body: self.body.clone(), // Get new reference count
+            closure: environment
+        };
+        Rc::new(Box::new(new_func))
+    }
+
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
         let environment = Environment::new(Some(self.closure.clone()));
 
@@ -734,7 +763,7 @@ impl AstVisitor<RunValue> for Interpreter {
         let object = expr.object.accept(self)?;
         let object = object.get_callable(expr.name.line)?;
         if let Some(instance) = object.to_instance() {
-            return Ok(instance.borrow().get(&expr.name.lexeme)?);
+            return Ok(LoxInstance::get(&instance, &expr.name.lexeme)?);
         }
         Err(Unwinder::error("Only instances have properties.", expr.name.line))
     }
@@ -781,6 +810,14 @@ impl AstVisitor<RunValue> for Interpreter {
             return Ok(value)
         }
         Err(Unwinder::error("Only instances have fields.", expr.name.line))
+    }
+
+    fn visit_this(&mut self, this: &This) -> RunValue {
+        let e: ExprId = addr_of!(*this) as ExprId;
+        match self.lookup_variable(&"this".to_string(), e) {
+            Ok(v) => {Ok(v)}
+            Err(err) => {Err(Unwinder::error(&err, this.keyword.line))}
+        }
     }
 
     fn visit_unary(&mut self, unary: &Unary) -> RunValue {
