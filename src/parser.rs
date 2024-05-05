@@ -4,6 +4,7 @@ use crate::lox::ast::{LiteralValue, VarName};
 use crate::lox::{ast, Token, TokenKind, TokenType};
 use crate::lox::ast::expression::{Binary, Call, Expr, Literal, Unary};
 use crate::lox::ast::statement::{Print, Expression, Stmt, Var, FuncList};
+use std::mem;
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -116,21 +117,31 @@ impl<'a> Parser<'a> {
 
     fn assignment(&mut self) -> ParserResult {
         let expr = self.or()?;
-        let is_equal = self.match_token(&[TokenKind::Equal]);
-        if  is_equal {
+        if  self.match_token(&[TokenKind::Equal]) {
             let equals = self.previous().clone();
             let value = self.assignment()?;
-            match &expr {
-                Expr::Variable(_) => {}
+            match expr {
+                Expr::Variable(_) => {
+                    return Ok(Expr::Assign(
+                        Box::pin(ast::expression::Assign{
+                            name: expr,
+                            value})
+                    ));
+                }
+                Expr::Get( mut x) => {
+                    let new_name = x.name.clone();
+                    let object = mem::take(&mut x.object);
+                    return Ok(Expr::Set(
+                        Box::pin(ast::expression::Set{
+                            name: new_name,
+                            object: object,
+                            value})
+                    ));
+                }
                 _ => {
                     return Err(self.error(&equals, "Invalid assignment target.".to_string()));
                 }
             };
-            return Ok(Expr::Assign(
-                Box::pin(ast::expression::Assign{
-                    name: expr,
-                    value})
-            ));
         }
 
         Ok(expr)

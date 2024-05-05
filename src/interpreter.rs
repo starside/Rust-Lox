@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use crate::lox::{ast, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -91,7 +91,7 @@ struct LoxInstance {
     fields: HashMap<RunString, EvalValue>
 }
 
-type LoxInstanceRef = Rc<Box<LoxInstance>>;
+type LoxInstanceRef = Rc<RefCell<LoxInstance>>;
 
 impl LoxInstance {
     pub fn get(&self, name: &str) -> Result<EvalValue, Unwinder> {
@@ -102,9 +102,15 @@ impl LoxInstance {
             Err(Unwinder::error(&format!("Undefined property '{}'.", name), 0))
         }
     }
+
+    pub fn set(&mut self, name: &str, value: EvalValue) {
+        let name = Rc::new(name.to_string());
+        self.fields.insert(name, value);
+    }
+
     pub fn new(class: &LoxClassRef) -> LoxInstanceRef {
         Rc::new(
-            Box::new(
+            RefCell::new(
                 LoxInstance {
                     class: class.clone(),
                     fields: HashMap::default()
@@ -124,7 +130,7 @@ impl Callable for LoxInstanceRef {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        let name = self.class.name.clone();
+        let name = self.borrow().class.name.clone();
         LiteralValue::String(Rc::new(format!("<instance {}>", name).to_string()))
     }
 
@@ -705,8 +711,7 @@ impl AstVisitor<RunValue> for Interpreter {
         let object = expr.object.accept(self)?;
         let object = object.get_callable(expr.name.line)?;
         if let Some(instance) = object.to_instance() {
-            instance.get(&expr.name.lexeme)?;
-            todo!()
+            return Ok(instance.borrow().get(&expr.name.lexeme)?);
         }
         Err(Unwinder::error("Only instances have properties.", expr.name.line))
     }
@@ -742,6 +747,17 @@ impl AstVisitor<RunValue> for Interpreter {
         }
 
         logical.right.accept(self)
+    }
+
+    fn visit_set(&mut self, expr: &Set) -> RunValue {
+        let object = expr.object.accept(self)?;
+        let object = object.get_callable(expr.name.line)?;
+        if let Some(instance) = object.to_instance() {
+            let value = expr.value.accept(self)?;
+            instance.borrow_mut().set(&expr.name.lexeme, value.clone());
+            return Ok(value)
+        }
+        Err(Unwinder::error("Only instances have fields.", expr.name.line))
     }
 
     fn visit_unary(&mut self, unary: &Unary) -> RunValue {

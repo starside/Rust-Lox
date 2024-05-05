@@ -117,9 +117,16 @@ pub mod ast {
             Grouping : Expr expression;
             Literal : LiteralValue value;
             Logical :  Expr left, Token operator, Expr right;
+            Set: Expr object, Token name, Expr value;
             Unary : Token operator, Expr right;
             Variable: VarName name;
         );
+
+        impl Default for Expr {
+            fn default() -> Self {
+                Expr::Empty
+            }
+        }
         type ExprList = Vec<Expr>;
     }
     pub mod statement{
