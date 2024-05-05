@@ -99,6 +99,9 @@ impl LoxInstance {
         if let Some(value) =  self.fields.get(&name) {
             Ok(value.clone())
         } else {
+            if let Some(method) = &self.class.find_method(&name) {
+                return Ok(EvalValue::LValue(method.clone()));
+            }
             Err(Unwinder::error(&format!("Undefined property '{}'.", name), 0))
         }
     }
@@ -140,16 +143,26 @@ impl Callable for LoxInstanceRef {
 }
 
 struct LoxClass {
-    name: RunString
+    name: RunString,
+    methods: HashMap<RunString, LValueType>
 }
 
 impl LoxClass {
-    pub fn new_ref(name: RunString) -> LoxClassRef {
+    pub fn new_ref(name: RunString, methods: HashMap<RunString, LValueType>) -> LoxClassRef {
         Rc::new(Box::new(
             LoxClass {
-                name
+                name,
+                methods
             }
         ))
+    }
+
+    pub fn find_method(&self, name: &RunString) -> Option<LValueType> {
+        if let Some(method) = self.methods.get(name) {
+            Some(method.clone())
+        } else {
+            None
+        }
     }
 }
 
@@ -522,7 +535,17 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         let mut env = self.environment.borrow_mut();
         env.define(name, EvalValue::RValue(LiteralValue::Nil));
-        let class =LoxClass::new_ref(name.clone());
+
+        let mut methods: HashMap<RunString, LValueType> = HashMap::default();
+        for method in &class.methods {
+            let function = LoxFunction::new(method, self.environment.clone());
+            methods.insert(
+                Rc::new(method.name.lexeme.clone()),
+                Rc::new(Box::new(function))
+            );
+        }
+
+        let class = LoxClass::new_ref(name.clone(), methods);
         env.assign(name, &EvalValue::LValue(
             Rc::new(Box::new(class))
         )).expect("Failed to assign");

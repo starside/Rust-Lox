@@ -11,7 +11,8 @@ type HashMap<K, V> = FxHashMap<K, V>;
 #[derive(Copy, Clone, PartialEq)]
 enum FunctionType {
     None,
-    Function
+    Function,
+    Method
 }
 
 pub struct Resolver<'i> {
@@ -214,6 +215,11 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         };
         self.declare(name).map_err(|x| {ResolverError::new(class.name.line, &x)})?;
         self.define(name);
+
+        for method in &class.methods {
+            self.resolve_function(method, FunctionType::Method)?;
+        }
+
         Ok(())
     }
 
