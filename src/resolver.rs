@@ -16,10 +16,17 @@ enum FunctionType {
     Method
 }
 
+#[derive(Copy, Clone)]
+enum ClassType {
+    None,
+    Class
+}
+
 pub struct Resolver<'i> {
     interpreter: &'i mut Interpreter,
     scopes: Vec<HashMap<RunString, bool>>,
-    current_function: FunctionType
+    current_function: FunctionType,
+    current_class: ClassType
 }
 
 pub struct ResolverError {
@@ -44,7 +51,7 @@ impl ResolverError {
 
 impl<'i> Resolver<'i> {
     pub fn new(interpreter: &'i mut Interpreter) -> Self {
-        Resolver{interpreter, scopes: Vec::new(), current_function: FunctionType::None}
+        Resolver{interpreter, scopes: Vec::new(), current_function: FunctionType::None, current_class: ClassType::None}
     }
 
     fn begin_scope(&mut self) {
@@ -181,6 +188,14 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
     }
 
     fn visit_this(&mut self, this: &This) -> Result<(), ResolverError> {
+        match self.current_class {
+            ClassType::Class => {}
+            ClassType::None => {
+                return Err(
+                    ResolverError::new(this.keyword.line, "Can't use 'this' outside of a class.")
+                );
+            }
+        }
         self.resolve_local(addr_of!(*this) as ExprId, &Rc::new(this.keyword.lexeme.clone()));
         Ok(())
     }
@@ -214,6 +229,9 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
     }
 
     fn visit_class(&mut self, class: &Class) -> Result<(), ResolverError> {
+        let enclosing_class = self.current_class;
+        self.current_class = ClassType::Class;
+
         let name = if let TokenType::Identifier(x) = &class.name.token_type {
             x
         } else {
@@ -230,7 +248,7 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         }
 
         self.end_scope();
-
+        self.current_class = enclosing_class;
         Ok(())
     }
 
