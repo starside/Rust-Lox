@@ -180,11 +180,15 @@ type LoxClassRef = Rc<Box<LoxClass>>;
 
 impl Callable for LoxClassRef {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
+        let instance = LoxInstance::new(self);
+        if let Some(initializer) = self.find_method(&Rc::new("init".to_string())) {
+            initializer.bind(&instance).call(interpreter, arguments)?;
+        }
         Ok(
             EvalValue::LValue(
                 Rc::new(
                     Box::new(
-                        LoxInstance::new(self)
+                        instance
                     )
                 )
             )
@@ -192,7 +196,10 @@ impl Callable for LoxClassRef {
     }
 
     fn arity(&self) -> usize {
-        0
+        if let Some(initializer) = self.find_method(&Rc::new("init".to_string())) {
+            return initializer.arity();
+        }
+        return 0;
     }
 
     fn to_literal(&self) -> LiteralValue {
@@ -212,11 +219,12 @@ struct LoxFunction {
     name: RunString,
     params: Vec<RunString>,
     body: ast::statement::FuncBody,
-    closure: EnvironmentRef
+    closure: EnvironmentRef,
+    is_initializer: bool
 }
 
 impl LoxFunction {
-    fn new(function: &Function, closure: EnvironmentRef) -> Self {
+    fn new(function: &Function, closure: EnvironmentRef, is_initializer: bool) -> Self {
         let name = if let TokenType::Identifier(n) = &function.name.token_type {
             n.clone()
         } else { panic!("Parser fucked up") };
@@ -237,7 +245,8 @@ impl LoxFunction {
             name,
             params,
             body: function.body.clone(), // Get new reference count
-            closure
+            closure,
+            is_initializer
         }
     }
 }
@@ -252,7 +261,8 @@ impl Callable for LoxFunction {
             name: self.name.clone(),
             params: self.params.clone(),
             body: self.body.clone(), // Get new reference count
-            closure: environment
+            closure: environment,
+            is_initializer: self.is_initializer
         };
         Rc::new(Box::new(new_func))
     }
@@ -283,7 +293,11 @@ impl Callable for LoxFunction {
                 }
             }
         }
-        Ok(EvalValue::RValue(LiteralValue::Nil))
+        if self.is_initializer {
+            Ok(self.closure.borrow().get_at(0, &"this".to_string()).unwrap())
+        } else {
+            Ok(EvalValue::RValue(LiteralValue::Nil))
+        }
     }
 
     fn arity(&self) -> usize {
@@ -567,7 +581,11 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         let mut methods: HashMap<RunString, LValueType> = HashMap::default();
         for method in &class.methods {
-            let function = LoxFunction::new(method, self.environment.clone());
+            let is_initializer = method.name.lexeme == "init";
+            let function = LoxFunction::new(
+                method,
+                self.environment.clone(),
+                is_initializer);
             methods.insert(
                 Rc::new(method.name.lexeme.clone()),
                 Rc::new(Box::new(function))
@@ -595,7 +613,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         let new_func = EvalValue::LValue(
             Rc::new(
-                Box::new(LoxFunction::new(function, self.environment.clone()))
+                Box::new(LoxFunction::new(function, self.environment.clone(), false))
             )
         );
 
