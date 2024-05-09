@@ -6,6 +6,7 @@ use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Bina
 use crate::lox::ast::statement::{Accept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
+use crate::lox::ast::LiteralValue;
 
 type HashMap<K, V> = FxHashMap<K, V>;
 
@@ -13,6 +14,7 @@ type HashMap<K, V> = FxHashMap<K, V>;
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method
 }
 
@@ -244,7 +246,12 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.scopes.last_mut().unwrap().insert(Rc::new("this".to_string()), true);
 
         for method in &class.methods {
-            self.resolve_function(method, FunctionType::Method)?;
+            let declaration = if method.name.lexeme == "init" {
+                FunctionType::Initializer
+            } else {
+                FunctionType::Method
+            };
+            self.resolve_function(method, declaration)?;
         }
 
         self.end_scope();
@@ -290,10 +297,17 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
             return ResolverError::error(stmt.keyword.line,
                  &format!("Error at \'{}\': Can't return from top-level code.", stmt.keyword.lexeme))
         }
-        if let Expr::Empty = stmt.value {}
-        else {
-            self.resolve_expression(&stmt.value)?;
+        if let Expr::Literal(x) = &stmt.value {
+            if x.value != LiteralValue::Nil {
+                if self.current_function == FunctionType::Initializer {
+                    return ResolverError::error(
+                        stmt.keyword.line,
+                        &"Can't return a value from an initializer.");
+                }
+            }
         }
+
+        self.resolve_expression(&stmt.value)?;
         Ok(())
     }
 

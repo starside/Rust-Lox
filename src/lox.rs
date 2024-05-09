@@ -78,7 +78,7 @@ pub enum TokenType {
 pub mod ast {
     use crate::lox::RunString;
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, PartialEq)]
     pub enum LiteralValue {
         String(RunString),
         Number(f64),

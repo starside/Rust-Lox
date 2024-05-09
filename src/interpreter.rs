@@ -289,6 +289,9 @@ impl Callable for LoxFunction {
                     return Err(err);
                 }
                 Unwinder::ReturnValue(val) => {
+                    if self.is_initializer {
+                        return Ok(self.closure.borrow().get_at(0, &"this".to_string()).unwrap());
+                    }
                     return Ok(val);
                 }
             }
