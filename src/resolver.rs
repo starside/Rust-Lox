@@ -302,7 +302,7 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 if self.current_function == FunctionType::Initializer {
                     return ResolverError::error(
                         stmt.keyword.line,
-                        &"Can't return a value from an initializer.");
+                        &&format!("Error at \'{}\':  Can't return a value from an initializer.", stmt.keyword.lexeme));
                 }
             }
         }
