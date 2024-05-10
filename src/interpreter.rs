@@ -20,6 +20,7 @@ pub trait Callable {
     fn to_literal(&self) -> LiteralValue;
     fn to_instance(&self) -> Option<LoxInstanceRef>;
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType;
+    fn get_obj_id(&self) -> usize;
 }
 
 type LValueType = Rc<Box<dyn Callable>>;
@@ -89,6 +90,10 @@ impl Callable for BuiltinFunctionTime {
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
         todo!()
     }
+
+    fn get_obj_id(&self) -> usize {
+        todo!()
+    }
 }
 
 struct LoxInstance {
@@ -148,6 +153,10 @@ impl Callable for LoxInstanceRef {
     }
 
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+        todo!()
+    }
+
+    fn get_obj_id(&self) -> usize {
         todo!()
     }
 }
@@ -212,6 +221,10 @@ impl Callable for LoxClassRef {
 
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
         todo!()
+    }
+
+    fn get_obj_id(&self) -> usize {
+        addr_of!(*self) as usize
     }
 }
 
@@ -313,6 +326,10 @@ impl Callable for LoxFunction {
 
     fn to_instance(&self) -> Option<LoxInstanceRef> {
         None
+    }
+
+    fn get_obj_id(&self) -> usize {
+        addr_of!(*self) as usize
     }
 }
 
@@ -706,16 +723,28 @@ impl AstVisitor<RunValue> for Interpreter {
     }
 
     fn visit_binary(&mut self, binary: &Binary) -> RunValue {
-        let left = binary.left.accept(self)?;
-        let left = left.get_literal();
-        let right = binary.right.accept(self)?;
-        let right = right.get_literal();
+        let left_e = binary.left.accept(self)?;
+        let left = left_e.get_literal();
+        let right_e = binary.right.accept(self)?;
+        let right = right_e.get_literal();
 
         let line = binary.operator.line;
 
         let value: LiteralValue = match binary.operator.token_type {
             TokenType::BangEqual => {LiteralValue::Boolean(!is_equal(&left, &right))}
-            TokenType::EqualEqual => {LiteralValue::Boolean(is_equal(&left, &right))}
+            TokenType::EqualEqual => {
+                if let Ok(l) = left_e.get_callable(0) {
+                    if let Ok(r) = right_e.get_callable(0) {
+                        LiteralValue::Boolean(l.get_obj_id() == r.get_obj_id())
+                    }
+                    else {
+                        LiteralValue::Boolean(false)
+                    }
+                }
+                else {
+                    LiteralValue::Boolean(is_equal(&left, &right))
+                }
+            }
             TokenType::Minus => {
                 let (l, r) = check_number_operands(line, &left, &right)?;
                 LiteralValue::Number(l - r)
