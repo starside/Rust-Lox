@@ -140,7 +140,7 @@ impl Callable for LoxInstanceRef {
 
     fn to_literal(&self) -> LiteralValue {
         let name = self.borrow().class.name.clone();
-        LiteralValue::String(Rc::new(format!("<instance {}>", name).to_string()))
+        LiteralValue::String(Rc::new(format!("{} instance", name).to_string()))
     }
 
     fn to_instance(&self) -> Option<LoxInstanceRef> {
@@ -203,7 +203,7 @@ impl Callable for LoxClassRef {
     }
 
     fn to_literal(&self) -> LiteralValue {
-        LiteralValue::String(Rc::new(format!("<class {}>", self.name)))
+        LiteralValue::String(Rc::new(self.name.to_string()))
     }
 
     fn to_instance(&self) -> Option<LoxInstanceRef> {
@@ -767,6 +767,11 @@ impl AstVisitor<RunValue> for Interpreter {
         let callee = expr.callee.accept(self)?;
         let callee = callee.get_callable(expr.paren.line)?;
 
+        if callee.to_instance().is_some() {
+            let err = format!("Can only call functions and classes.");
+            return Err(Unwinder::error(&err, expr.paren.line));
+        }
+
         if expr.arguments.len() != callee.arity(){
             let err = format!("Expected {} arguments but got {}.", callee.arity(), expr.arguments.len());
             return Err(Unwinder::error(&err, expr.paren.line));
@@ -782,9 +787,10 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_get(&mut self, expr: &Get) -> RunValue {
         let object = expr.object.accept(self)?;
-        let object = object.get_callable(expr.name.line)?;
-        if let Some(instance) = object.to_instance() {
-            return Ok(LoxInstance::get(&instance, &expr.name.lexeme)?);
+        if let Ok(object) = object.get_callable(expr.name.line) {
+            if let Some(instance) = object.to_instance() {
+                return Ok(LoxInstance::get(&instance, &expr.name.lexeme)?);
+            }
         }
         Err(Unwinder::error("Only instances have properties.", expr.name.line))
     }
@@ -824,11 +830,12 @@ impl AstVisitor<RunValue> for Interpreter {
 
     fn visit_set(&mut self, expr: &Set) -> RunValue {
         let object = expr.object.accept(self)?;
-        let object = object.get_callable(expr.name.line)?;
-        if let Some(instance) = object.to_instance() {
-            let value = expr.value.accept(self)?;
-            instance.borrow_mut().set(&expr.name.lexeme, value.clone());
-            return Ok(value)
+        if let Ok(object) = object.get_callable(expr.name.line) {
+            if let Some(instance) = object.to_instance() {
+                let value = expr.value.accept(self)?;
+                instance.borrow_mut().set(&expr.name.lexeme, value.clone());
+                return Ok(value)
+            }
         }
         Err(Unwinder::error("Only instances have fields.", expr.name.line))
     }
