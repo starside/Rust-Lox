@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::ops::Deref;
 use std::ptr::addr_of;
 use std::rc::Rc;
@@ -194,7 +195,8 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
             ClassType::Class => {}
             ClassType::None => {
                 return Err(
-                    ResolverError::new(this.keyword.line, "Can't use 'this' outside of a class.")
+                    ResolverError::new(this.keyword.line,
+                   &format!("Error at \'{}\': Can't use 'this' outside of a class.", this.keyword.lexeme))
                 );
             }
         }
@@ -302,7 +304,7 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 if self.current_function == FunctionType::Initializer {
                     return ResolverError::error(
                         stmt.keyword.line,
-                        &&format!("Error at \'{}\':  Can't return a value from an initializer.", stmt.keyword.lexeme));
+                        &&format!("Error at \'{}\': Can't return a value from an initializer.", stmt.keyword.lexeme));
                 }
             }
         }

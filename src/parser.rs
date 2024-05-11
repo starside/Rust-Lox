@@ -67,7 +67,14 @@ impl<'a> Parser<'a> {
 
         (
             token.clone(),
-            format!("Error at \'{}\': {}", token.lexeme, message)
+            match token.token_type {
+                TokenType::Eof => {
+                    format!("Error at end: {}", message)
+                },
+                _ => {
+                    format!("Error at \'{}\': {}", token.lexeme, message)
+                }
+            }
         )
     }
 

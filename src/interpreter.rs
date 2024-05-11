@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use crate::lox::{ast, TokenType};
+use crate::lox::{ast, Token, TokenType};
 use crate::lox::ast::LiteralValue;
 use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
@@ -104,16 +104,16 @@ struct LoxInstance {
 type LoxInstanceRef = Rc<RefCell<LoxInstance>>;
 
 impl LoxInstance {
-    pub fn get(instance: &LoxInstanceRef, name: &str) -> Result<EvalValue, Unwinder> {
-        let name = Rc::new(name.to_string());
-        if let Some(value) =  instance.borrow().fields.get(&name) {
+    pub fn get(instance: &LoxInstanceRef, name: &Token) -> Result<EvalValue, Unwinder> {
+        let name_string = Rc::new(name.lexeme.to_string());
+        if let Some(value) =  instance.borrow().fields.get(&name_string) {
             Ok(value.clone())
         } else {
-            if let Some(method) = &instance.borrow().class.find_method(&name) {
+            if let Some(method) = &instance.borrow().class.find_method(&name_string) {
                 let bound_method = method.bind(instance);
                 return Ok(EvalValue::LValue(bound_method));
             }
-            Err(Unwinder::error(&format!("Undefined property '{}'.", name), 0))
+            Err(Unwinder::error(&format!("Undefined property '{}'.", name_string), name.line))
         }
     }
 
@@ -818,7 +818,7 @@ impl AstVisitor<RunValue> for Interpreter {
         let object = expr.object.accept(self)?;
         if let Ok(object) = object.get_callable(expr.name.line) {
             if let Some(instance) = object.to_instance() {
-                return Ok(LoxInstance::get(&instance, &expr.name.lexeme)?);
+                return Ok(LoxInstance::get(&instance, &expr.name)?);
             }
         }
         Err(Unwinder::error("Only instances have properties.", expr.name.line))
