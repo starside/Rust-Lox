@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::ptr::addr_of;
 use std::rc::Rc;
 use crate::interpreter::{ExprId, Interpreter};
-use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable};
+use crate::lox::ast::expression::{Accept as ExprAccept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Super, This, Unary, Variable};
 use crate::lox::ast::statement::{Accept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtList, StmtVisitor, Var, While};
 use crate::lox::{RunString, TokenType};
 use rustc_hash::{FxHashMap};
@@ -190,6 +190,11 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
         Ok(())
     }
 
+    fn visit_super(&mut self, expr: &Super) -> Result<(), ResolverError> {
+        self.resolve_local(addr_of!(*expr) as ExprId, &Rc::new(expr.keyword.lexeme.clone()));
+        Ok(())
+    }
+
     fn visit_this(&mut self, this: &This) -> Result<(), ResolverError> {
         match self.current_class {
             ClassType::Class => {}
@@ -233,6 +238,7 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
     }
 
     fn visit_class(&mut self, class: &Class) -> Result<(), ResolverError> {
+        let mut has_superclass = false;
         let enclosing_class = self.current_class;
         self.current_class = ClassType::Class;
 
@@ -257,7 +263,13 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 },
                 _ => {panic!("Parser fucked up, this should only be Variable");}
             }
+            has_superclass = true;
             self.resolve_expression(superclass)?;
+        }
+
+        if has_superclass {
+            self.begin_scope();
+            self.scopes.last_mut().unwrap().insert(Rc::new("super".to_string()), true);
         }
 
         self.begin_scope();
@@ -270,6 +282,10 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 FunctionType::Method
             };
             self.resolve_function(method, declaration)?;
+        }
+
+        if has_superclass {
+            self.end_scope();
         }
 
         self.end_scope();

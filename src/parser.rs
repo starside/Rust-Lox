@@ -350,6 +350,16 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Grouping(Box::pin(ast::expression::Grouping{expression: expr})));
         }
 
+        if self.match_token(&[TokenKind::Super]) {
+            let keyword = self.previous().clone();
+            self.consume(TokenKind::Dot, "Expect \'.\' after \'super\'.".to_string())?;
+            let method = self.consume(TokenKind::Identifier, "Expect superclass method name.".to_string())?;
+            return Ok(Expr::Super(Box::pin(ast::expression::Super{
+                keyword,
+                method
+            })));
+        }
+
         Err(self.error(self.peek(), "Expect expression.".to_string()))
     }
 

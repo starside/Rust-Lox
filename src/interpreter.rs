@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use crate::lox::{ast, Token, TokenType};
 use crate::lox::ast::LiteralValue;
-use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable};
+use crate::lox::ast::expression::{Accept, Assign, AstVisitor, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Super, This, Unary, Variable};
 use crate::lox::ast::statement::{Accept as StmtAccept, Block, Class, Expression, Function, If, Print, Return, Stmt, StmtVisitor, Var, While};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -652,8 +652,14 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
                 None
             };
 
-        let mut env = self.environment.borrow_mut();
-        env.define(name, EvalValue::RValue(LiteralValue::Nil));
+        self.environment.borrow_mut().define(name, EvalValue::RValue(LiteralValue::Nil));
+
+        let has_superclass = superclass.is_some();
+        let mut env = if has_superclass {
+            Environment::new(Some(self.environment.clone()))
+        } else {
+            self.environment.clone()
+        };
 
         let mut methods: HashMap<RunString, LValueType> = HashMap::default();
         for method in &class.methods {
@@ -669,7 +675,18 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
         }
 
         let class = LoxClass::new_ref(name.clone(), methods, superclass);
-        env.assign(name, &EvalValue::LValue(
+
+        if has_superclass {
+            let enclosing = match &env.borrow().enclosing {
+                None => {panic!("Should never happen")}
+                Some(x) => {
+                    x.clone()
+                }
+            };
+            env = enclosing;
+        }
+
+        env.borrow_mut().assign(name, &EvalValue::LValue(
             Rc::new(Box::new(class))
         )).expect("Failed to assign");
         Ok(())
@@ -923,6 +940,10 @@ impl AstVisitor<RunValue> for Interpreter {
             }
         }
         Err(Unwinder::error("Only instances have fields.", expr.name.line))
+    }
+
+    fn visit_super(&mut self, visitor: &Super) -> RunValue {
+        todo!()
     }
 
     fn visit_this(&mut self, this: &This) -> RunValue {
