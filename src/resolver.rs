@@ -244,6 +244,22 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.declare(name).map_err(|x| {ResolverError::new(class.name.line, &x)})?;
         self.define(name);
 
+        if let Some(superclass) = &class.superclass {
+            match superclass {
+                Expr::Variable(s) => {
+                    if s.name.lexeme.as_str() == class.name.lexeme.as_str() {
+                        return ResolverError::error(
+                            s.name.line,
+                            &format!(
+                                "Error at \'{}\': A class can't inherit from itself.",
+                                s.name.lexeme));
+                    }
+                },
+                _ => {panic!("Parser fucked up, this should only be Variable");}
+            }
+            self.resolve_expression(superclass)?;
+        }
+
         self.begin_scope();
         self.scopes.last_mut().unwrap().insert(Rc::new("this".to_string()), true);
 

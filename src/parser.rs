@@ -578,6 +578,24 @@ impl<'a> Parser<'a> {
 
     fn class_declaration(&mut self) -> StatementResult {
         let name = self.consume(TokenKind::Identifier, "Expect class name".to_string())?;
+
+        let superclass:Option<Expr> = if self.match_token(&[TokenKind::Less]) {
+            self.consume(TokenKind::Identifier, "Expect superclass name.".to_string())?;
+            let prev = self.previous();
+            Some(Expr::Variable(
+                Box::pin(
+                    ast::expression::Variable {
+                        name: VarName {
+                            lexeme: Rc::new(prev.lexeme.clone()),
+                            line: prev.line
+                        }
+                    }
+                )
+            ))
+        } else {
+            None
+        };
+
         self.consume(TokenKind::LeftBrace, "Expect '{' before class body.".to_string())?;
         let mut methods: FuncList = Vec::new();
         while !self.check(&[TokenKind::RightBrace]) && !self.is_at_end() {
@@ -596,7 +614,8 @@ impl<'a> Parser<'a> {
                 Box::pin(
                     ast::statement::Class {
                         name,
-                        methods
+                        methods,
+                        superclass
                     }
                 )
             )

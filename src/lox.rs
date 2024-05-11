@@ -10,6 +10,7 @@ extern crate lox_derive_ast;
 use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
+use crate::lox::ast::expression::Expr::Variable;
 use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::{Resolver, ResolverError};
 
@@ -139,11 +140,12 @@ pub mod ast {
         use std::pin::Pin;
 
         type Expr = expression::Expr;
+        type OptionalExpr = Option<Expr>;
 
         derive_ast!(
             Stmt/Stmt/
             Block: StmtList statements;
-            Class : Token name, FuncList methods;
+            Class : Token name, FuncList methods, OptionalExpr superclass;
             Expression : Expr expression;
             Function: Token name, TokenList params, FuncBody body;
             If: Expr condition, Stmt then_branch, Stmt else_branch;

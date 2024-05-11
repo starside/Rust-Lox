@@ -19,6 +19,7 @@ pub trait Callable {
     fn arity(&self) -> usize;
     fn to_literal(&self) -> LiteralValue;
     fn to_instance(&self) -> Option<LoxInstanceRef>;
+    fn to_class(&self) -> Option<LoxClassRef>;
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType;
     fn get_obj_id(&self) -> usize;
 }
@@ -87,6 +88,10 @@ impl Callable for BuiltinFunctionTime {
         None
     }
 
+    fn to_class(&self) -> Option<LoxClassRef> {
+        None
+    }
+
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
         todo!()
     }
@@ -152,6 +157,10 @@ impl Callable for LoxInstanceRef {
         Some(self.clone())
     }
 
+    fn to_class(&self) -> Option<LoxClassRef> {
+        None
+    }
+
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
         todo!()
     }
@@ -163,15 +172,17 @@ impl Callable for LoxInstanceRef {
 
 struct LoxClass {
     name: RunString,
-    methods: HashMap<RunString, LValueType>
+    methods: HashMap<RunString, LValueType>,
+    superclass: Option<LoxClassRef>
 }
 
 impl LoxClass {
-    pub fn new_ref(name: RunString, methods: HashMap<RunString, LValueType>) -> LoxClassRef {
+    pub fn new_ref(name: RunString, methods: HashMap<RunString, LValueType>, superclass: Option<LoxClassRef>) -> LoxClassRef {
         Rc::new(Box::new(
             LoxClass {
                 name,
-                methods
+                methods,
+                superclass
             }
         ))
     }
@@ -180,7 +191,12 @@ impl LoxClass {
         if let Some(method) = self.methods.get(name) {
             Some(method.clone())
         } else {
-            None
+            match &self.superclass {
+                None => {None}
+                Some(x) => {
+                    x.find_method(name)
+                }
+            }
         }
     }
 }
@@ -217,6 +233,10 @@ impl Callable for LoxClassRef {
 
     fn to_instance(&self) -> Option<LoxInstanceRef> {
         None
+    }
+
+    fn to_class(&self) -> Option<LoxClassRef> {
+        Some(self.clone())
     }
 
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
@@ -330,6 +350,10 @@ impl Callable for LoxFunction {
 
     fn get_obj_id(&self) -> usize {
         addr_of!(*self) as usize
+    }
+
+    fn to_class(&self) -> Option<LoxClassRef> {
+        None
     }
 }
 
@@ -596,6 +620,38 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
             panic!("Parser messed up function token");
         };
 
+        let superclass =
+            if let Some(x) = &class.superclass {
+                let superclass = x.accept(self)?;
+
+                if let Expr::Variable(s) = x {
+                    let line = s.name.line;
+                    let class_ref = match superclass.get_callable(line) {
+                        Ok(y) => {
+                            y.to_class()
+                        }
+                        Err(_) => {None}
+                    };
+                    match &class_ref {
+                        None => {
+                            return Err(Unwinder::RuntimeError(
+                                RuntimeErrorReport::new(
+                                    "Superclass must be a class.",
+                                    line
+                                )
+                            ));
+                        }
+                        Some(class) => {
+                            Some(class.clone())
+                        }
+                    }
+                } else {
+                    panic!("Parser should not let this happen")
+                }
+            } else {
+                None
+            };
+
         let mut env = self.environment.borrow_mut();
         env.define(name, EvalValue::RValue(LiteralValue::Nil));
 
@@ -612,7 +668,7 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
             );
         }
 
-        let class = LoxClass::new_ref(name.clone(), methods);
+        let class = LoxClass::new_ref(name.clone(), methods, superclass);
         env.assign(name, &EvalValue::LValue(
             Rc::new(Box::new(class))
         )).expect("Failed to assign");
