@@ -27,8 +27,10 @@ fn process_status_code(status: Result<(), RunErrorType>) {
                     }
                     std::process::exit(65);
                 }
-                RunErrorType::Resolver(msg) => {
-                    eprintln!("[line {}] {}", msg.line, msg.message);
+                RunErrorType::Resolver(msg_list) => {
+                    for msg in msg_list {
+                        eprintln!("[line {}] {}", msg.line, msg.message);
+                    }
                     std::process::exit(65);
                 }
                 RunErrorType::Interpreter(msg) => {

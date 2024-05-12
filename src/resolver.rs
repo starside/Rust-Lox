@@ -66,7 +66,7 @@ impl<'i> Resolver<'i> {
         self.scopes.pop();
     }
 
-    fn resolve_statement(&mut self, statement: &Stmt) -> Result<(), ResolverError> {
+    pub fn resolve_statement(&mut self, statement: &Stmt) -> Result<(), ResolverError> {
         statement.accept(self)
     }
 

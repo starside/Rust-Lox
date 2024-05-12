@@ -191,20 +191,17 @@ fn run(source: &str) -> Result<(), RunErrorType>{
     let mut resolver: Resolver = Resolver::new(&mut interpreter);
 
     // Run Resolver
-    let mut resolve_error: Vec<ResolverError> = Vec::new();
-    match resolver.resolve_statement_list(&statements) {
-        Ok(_) => {
-            println!("No error");
+    let mut resolve_error: Vec<ResolverError> = statements.iter().filter_map(|stmt| {
+        match resolver.resolve_statement(stmt) {
+            Ok(_) => {None}
+            Err(e) => {
+                Some(e)
+            }
         }
-        Err(e) => {
-            println!("error");
-            resolve_error.push(e);
-        }
-    }
+    }).collect();
 
-    println!("num resolver errors {}", resolve_error.len());
-    for e in resolve_error {
-        return Err(RunErrorType::Resolver(e))
+    if !resolve_error.is_empty(){
+        return Err(RunErrorType::Resolver(resolve_error))
     }
 
     // Run interpreter
@@ -227,7 +224,7 @@ fn run(source: &str) -> Result<(), RunErrorType>{
 
 pub enum RunErrorType {
     ScannerParser(Vec<(usize, String)>, Vec<ParserError>),
-    Resolver(ResolverError),
+    Resolver(Vec<ResolverError>),
     Interpreter(String),
     IOError(String)
 }
