@@ -98,7 +98,7 @@ impl Callable for BuiltinFunctionTime {
         None
     }
 
-    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
+    fn bind(&self, _: &LoxInstanceRef) -> LValueType {
         todo!()
     }
 
@@ -107,7 +107,7 @@ impl Callable for BuiltinFunctionTime {
     }
 }
 
-struct LoxInstance {
+pub struct LoxInstance {
     class: LoxClassRef,
     fields: HashMap<RunString, EvalValue>
 }
@@ -146,12 +146,12 @@ impl LoxInstance {
 }
 
 impl Callable for LoxInstanceRef {
-    fn call(&self, interpreter: &mut Interpreter, arguments: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
-        todo!()
+    fn call(&self, _: &mut Interpreter, _: Vec<EvalValue>) -> Result<EvalValue, RuntimeErrorReport> {
+        unreachable!()
     }
 
     fn arity(&self) -> usize {
-        todo!()
+        unreachable!()
     }
 
     fn to_literal(&self) -> LiteralValue {
@@ -167,16 +167,16 @@ impl Callable for LoxInstanceRef {
         None
     }
 
-    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
-        todo!()
+    fn bind(&self, _: &LoxInstanceRef) -> LValueType {
+        unreachable!()
     }
 
     fn get_obj_id(&self) -> usize {
-        todo!()
+        unreachable!()
     }
 }
 
-struct LoxClass {
+pub struct LoxClass {
     name: RunString,
     methods: HashMap<RunString, LValueType>,
     superclass: Option<LoxClassRef>
@@ -245,8 +245,8 @@ impl Callable for LoxClassRef {
         Some(self.clone())
     }
 
-    fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
-        todo!()
+    fn bind(&self, _: &LoxInstanceRef) -> LValueType {
+        unreachable!()
     }
 
     fn get_obj_id(&self) -> usize {
@@ -291,7 +291,7 @@ impl LoxFunction {
 }
 impl Callable for LoxFunction {
     fn bind(&self, instance: &LoxInstanceRef) -> LValueType {
-        let mut environment = Environment::new(Some(self.closure.clone()));
+        let environment = Environment::new(Some(self.closure.clone()));
         environment.borrow_mut().define("this",
                                         EvalValue::LValue(
                                             Rc::new(Box::new(instance.clone()))

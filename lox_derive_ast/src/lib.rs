@@ -203,8 +203,6 @@ pub fn derive_ast(input: TokenStream) -> TokenStream {
     let expression_name = input_array[1].to_string().clone();
     let input_string = input_array[2].to_string().clone();
 
-    println!("{}: {:?}", input_array.len(), input_array);
-
     let rules: Vec<&str> =input_string
         .split(";")
         .map(|rule| rule.trim())

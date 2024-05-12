@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::ops::Deref;
 use std::ptr::addr_of;
 use std::rc::Rc;

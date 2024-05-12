@@ -10,7 +10,6 @@ extern crate lox_derive_ast;
 use crate::parser::{Parser, ParserError};
 use crate::{scanner};
 use crate::interpreter::{Interpreter, Unwinder};
-use crate::lox::ast::expression::Expr::Variable;
 use crate::lox::ast::statement::{Accept as StatementAccept};
 use crate::resolver::{Resolver, ResolverError};
 
@@ -191,7 +190,7 @@ fn run(source: &str) -> Result<(), RunErrorType>{
     let mut resolver: Resolver = Resolver::new(&mut interpreter);
 
     // Run Resolver
-    let mut resolve_error: Vec<ResolverError> = statements.iter().filter_map(|stmt| {
+    let resolve_error: Vec<ResolverError> = statements.iter().filter_map(|stmt| {
         match resolver.resolve_statement(stmt) {
             Ok(_) => {None}
             Err(e) => {
