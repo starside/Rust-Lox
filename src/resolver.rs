@@ -22,7 +22,8 @@ enum FunctionType {
 #[derive(Copy, Clone)]
 enum ClassType {
     None,
-    Class
+    Class,
+    Subclass
 }
 
 pub struct Resolver<'i> {
@@ -191,13 +192,30 @@ impl AstVisitor<Result<(), ResolverError>> for Resolver<'_>{
     }
 
     fn visit_super(&mut self, expr: &Super) -> Result<(), ResolverError> {
+        match self.current_class {
+            ClassType::None => {
+                return Err(
+                    ResolverError::new(expr.keyword.line,
+                    &format!("Error at \'{}\': Can't use 'super' outside of a class.",
+                             expr.keyword.lexeme))
+                );
+            }
+            ClassType::Class => {
+                return Err(
+                    ResolverError::new(expr.keyword.line,
+                        &format!("Error at \'{}\': Can't use 'super' in a class with no superclass.",
+                         expr.keyword.lexeme))
+                );
+            }
+            ClassType::Subclass => {}
+        }
         self.resolve_local(addr_of!(*expr) as ExprId, &Rc::new(expr.keyword.lexeme.clone()));
         Ok(())
     }
 
     fn visit_this(&mut self, this: &This) -> Result<(), ResolverError> {
         match self.current_class {
-            ClassType::Class => {}
+            ClassType::Class | ClassType::Subclass => {}
             ClassType::None => {
                 return Err(
                     ResolverError::new(this.keyword.line,
@@ -263,6 +281,7 @@ impl StmtVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 },
                 _ => {panic!("Parser fucked up, this should only be Variable");}
             }
+            self.current_class = ClassType::Subclass;
             has_superclass = true;
             self.resolve_expression(superclass)?;
         }

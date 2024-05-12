@@ -191,11 +191,20 @@ fn run(source: &str) -> Result<(), RunErrorType>{
     let mut resolver: Resolver = Resolver::new(&mut interpreter);
 
     // Run Resolver
+    let mut resolve_error: Vec<ResolverError> = Vec::new();
     match resolver.resolve_statement_list(&statements) {
-        Ok(_) => {}
-        Err(e) => {
-            return Err(RunErrorType::Resolver(e));
+        Ok(_) => {
+            println!("No error");
         }
+        Err(e) => {
+            println!("error");
+            resolve_error.push(e);
+        }
+    }
+
+    println!("num resolver errors {}", resolve_error.len());
+    for e in resolve_error {
+        return Err(RunErrorType::Resolver(e))
     }
 
     // Run interpreter

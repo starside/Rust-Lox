@@ -56,6 +56,12 @@ impl From<LiteralValue> for EvalValue{
     }
 }
 
+impl From<LValueType> for EvalValue {
+    fn from(value: LValueType) -> Self {
+        EvalValue::LValue(value)
+    }
+}
+
 type RunValue = Result<EvalValue, Unwinder>;
 
 // The AST uses pinned allocations so I can generate a hash based on the pointer value,
@@ -451,7 +457,7 @@ impl Environment {
                     return Ok(t.clone());
                 }
                 else {
-                    panic!("Variable not found")
+                    panic!("Variable not found {:?}, distance {}", val.borrow().values.keys(), distance)
                 }
             }
         }
@@ -620,9 +626,12 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
             panic!("Parser messed up function token");
         };
 
+        let mut superclass_ref: Option<EvalValue> = None;
+
         let superclass =
             if let Some(x) = &class.superclass {
                 let superclass = x.accept(self)?;
+                superclass_ref = Some(superclass.clone());
 
                 if let Expr::Variable(s) = x {
                     let line = s.name.line;
@@ -654,12 +663,10 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         self.environment.borrow_mut().define(name, EvalValue::RValue(LiteralValue::Nil));
 
-        let has_superclass = superclass.is_some();
-        let mut env = if has_superclass {
-            Environment::new(Some(self.environment.clone()))
-        } else {
-            self.environment.clone()
-        };
+        if let Some(superclass) = &superclass_ref {
+            self.environment = Environment::new(Some(self.environment.clone()));
+            self.environment.borrow_mut().define("super", superclass.clone())
+        }
 
         let mut methods: HashMap<RunString, LValueType> = HashMap::default();
         for method in &class.methods {
@@ -676,17 +683,17 @@ impl StmtVisitor<Result<(), Unwinder>> for Interpreter
 
         let class = LoxClass::new_ref(name.clone(), methods, superclass);
 
-        if has_superclass {
-            let enclosing = match &env.borrow().enclosing {
+        if superclass_ref.is_some() {
+            let enclosing = match &self.environment.borrow().enclosing {
                 None => {panic!("Should never happen")}
                 Some(x) => {
                     x.clone()
                 }
             };
-            env = enclosing;
+            self.environment = enclosing;
         }
 
-        env.borrow_mut().assign(name, &EvalValue::LValue(
+        self.environment.borrow_mut().assign(name, &EvalValue::LValue(
             Rc::new(Box::new(class))
         )).expect("Failed to assign");
         Ok(())
@@ -942,8 +949,30 @@ impl AstVisitor<RunValue> for Interpreter {
         Err(Unwinder::error("Only instances have fields.", expr.name.line))
     }
 
-    fn visit_super(&mut self, visitor: &Super) -> RunValue {
-        todo!()
+    fn visit_super(&mut self, expr: &Super) -> RunValue {
+        let expr_id = addr_of!(*expr) as ExprId;
+        let distance = *self.locals.get(&expr_id).expect("Resolver did not define super");
+        let superclass =
+            self.environment.borrow().get_at(distance, &"super".to_string())
+                .expect("Failed to get superclass")
+                .get_callable(0)?.to_class().unwrap();
+        let object =
+            self.environment.borrow().get_at(distance-1, &"this".to_string())
+                .expect("Failed to get this")
+                .get_callable(0)?.to_instance().unwrap();
+       match superclass.find_method(&Rc::new(expr.method.lexeme.to_string())) {
+           None => {
+               Err(Unwinder::RuntimeError(
+                   RuntimeErrorReport::new(
+                       &format!("Undefined property \'{}\'.", expr.method.lexeme),
+                       expr.method.line
+                   )
+               ))
+           }
+           Some(method) => {
+               Ok(method.bind(&object).into())
+           }
+       }
     }
 
     fn visit_this(&mut self, this: &This) -> RunValue {
